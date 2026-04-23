@@ -1,0 +1,195 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --teal:       #0B7B6F;
+  --teal2:      #096358;
+  --teal3:      #0FA898;
+  --teal-light: #E6F4F2;
+  --teal-mid:   #B2DDD8;
+  --navy:       #0A1628;
+  --navy2:      #0F2040;
+  --gold:       #C9A84C;
+  --gold2:      #E8C46A;
+  --cream:      #F8FAFA;
+  --cream2:     #EFF7F6;
+  --text:       #0F2040;
+  --muted:      #64748B;
+  --border:     #E2EEEC;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #ffffff;
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: var(--teal); border-radius: 3px; }
+
+/* Custom cursor */
+#cursor {
+  position: fixed;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--teal);
+  pointer-events: none;
+  z-index: 9998;
+  transform: translate(-50%, -50%);
+  transition: transform 0.15s ease;
+  mix-blend-mode: multiply;
+}
+#cursor-ring {
+  position: fixed;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(11,123,111,0.4);
+  pointer-events: none;
+  z-index: 9997;
+  transform: translate(-50%, -50%);
+  transition: left 0.1s ease, top 0.1s ease;
+}
+
+/* Section tag */
+.section-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.section-tag::before {
+  content: '';
+  width: 24px; height: 2px;
+  background: var(--teal);
+  border-radius: 1px;
+}
+
+/* Section heading */
+.section-h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(32px, 4vw, 50px);
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1.1;
+  margin-bottom: 16px;
+}
+.section-h2 em { font-style: italic; color: var(--teal); }
+
+/* 🔥 UPDATED BUTTONS */
+.btn-primary {
+  background: linear-gradient(135deg, var(--teal), var(--teal2));
+  color: white;
+  padding: 13px 26px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-family: 'DM Sans', sans-serif;
+
+  box-shadow: 0 8px 22px rgba(11,123,111,0.25);
+  transition: all 0.25s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 16px 36px rgba(11,123,111,0.35);
+}
+
+/* Secondary */
+.btn-secondary {
+  background: white;
+  color: var(--teal);
+  padding: 13px 26px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1.5px solid var(--teal-mid);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-family: 'DM Sans', sans-serif;
+
+  transition: all 0.25s ease;
+}
+
+.btn-secondary:hover {
+  transform: translateY(-2px);
+  background: var(--teal-light);
+  border-color: var(--teal);
+  box-shadow: 0 10px 24px rgba(11,123,111,0.15);
+}
+
+/* Card base */
+.card {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 24px rgba(11,123,111,0.08);
+  transition: all 0.25s ease;
+}
+.card:hover {
+  box-shadow: 0 16px 48px rgba(11,123,111,0.14);
+  transform: translateY(-3px);
+}
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.85); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+@keyframes floatRev {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(8px); }
+}
+@keyframes glowPulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.06); }
+}
+@keyframes ring {
+  0%   { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes countUp {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes floatDot {
+  0%,100% { transform: translateY(0) }
+  50% { transform: translateY(-12px) }
+}

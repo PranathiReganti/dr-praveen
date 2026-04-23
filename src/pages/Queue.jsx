@@ -1,0 +1,186 @@
+import { useState } from 'react'
+import { Helmet } from 'react-helmet-async'
+import { collection, addDoc, query, where, getDocs, Timestamp } from 'firebase/firestore'
+import { db } from '../firebase/config'
+import { CLINICS, DOCTOR } from '../data/content'
+
+const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
+
+async function sendSMS(phone, name, token, clinic) {
+  const key = import.meta.env.VITE_FAST2SMS_KEY
+  if (!key) return
+  const msg = `Hi ${name}, your token is #${String(token).padStart(2,'0')} at ${clinic}. Track your position: ${window.location.origin}/track?phone=${phone}. - Dr. Praveen Ramachandra`
+  try {
+    await fetch(`https://www.fast2sms.com/dev/bulkV2?authorization=${key}&route=q&message=${encodeURIComponent(msg)}&language=english&flash=0&numbers=${phone}`)
+  } catch {}
+}
+
+export default function Queue() {
+  const [step, setStep]     = useState(1)
+  const [clinic, setClinic] = useState('')
+  const [form, setForm]     = useState({ name: '', phone: '', doctor: 'Dr. Praveen Ramachandra', reason: '' })
+  const [token, setToken]   = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError]   = useState('')
+
+  async function generateToken() {
+    if (!form.name || !form.phone || !form.reason) { setError('Please fill all fields'); return }
+    if (form.phone.length < 10) { setError('Enter a valid 10-digit phone number'); return }
+    setLoading(true); setError('')
+    try {
+      const today = new Date().toDateString()
+      const q = query(collection(db, 'patients'), where('clinicId', '==', clinic), where('date', '==', today))
+      const snap = await getDocs(q)
+      const tokenNum = snap.size + 1
+      await addDoc(collection(db, 'patients'), {
+        ...form, clinicId: clinic, tokenNumber: tokenNum,
+        status: 'waiting', date: today,
+        createdAt: Timestamp.now(), payment: false, consultationFee: 500,
+      })
+      await sendSMS(form.phone, form.name, tokenNum, clinic)
+      setToken(tokenNum)
+      setStep(4)
+    } catch (e) {
+      setError('Something went wrong. Please try again.')
+    }
+    setLoading(false)
+  }
+
+  const clinicObj = CLINICS.find(c => c.id === clinic)
+
+  return (
+    <>
+      <Helmet><title>Book Token | {DOCTOR.name}</title></Helmet>
+      <div style={{ paddingTop: '72px', minHeight: '100vh', background: '#F8FAFA' }}>
+
+        {/* Header */}
+        <div style={{ background: 'linear-gradient(135deg,#0A1628,#0F2040)', padding: '60px 5%', textAlign: 'center' }}>
+          <div className="section-tag" style={{ justifyContent: 'center', color: '#0FA898' }}>QUEUE SYSTEM</div>
+          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 'clamp(32px,4vw,52px)', fontWeight: '700', color: '#fff' }}>
+            Skip the Wait — <em style={{ fontStyle: 'italic', color: '#0FA898' }}>Book Your Token</em>
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.6)', marginTop: '12px' }}>Walk in at the right time. No more crowding at reception.</p>
+        </div>
+
+        {/* Progress */}
+        {step < 4 && (
+          <div style={{ background: '#fff', borderBottom: '1px solid #E2EEEC', padding: '16px 5%', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
+            {['Choose Clinic','Your Details','Confirm'].map((s, i) => (
+              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: step > i + 1 ? '#0B7B6F' : step === i + 1 ? '#0B7B6F' : '#E2EEEC', color: step >= i + 1 ? '#fff' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>{step > i + 1 ? '' : i + 1}</div>
+                <span style={{ fontSize: '13px', fontWeight: step === i + 1 ? '700' : '400', color: step === i + 1 ? '#0A1628' : '#64748B' }}>{s}</span>
+                {i < 2 && <span style={{ color: '#E2EEEC', fontSize: '16px' }}>›</span>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ maxWidth: '560px', margin: '48px auto', padding: '0 5%' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 24px rgba(11,123,111,0.08)', border: '1px solid #E2EEEC' }}>
+
+            {/* Step 1 — Choose Clinic */}
+            {step === 1 && (
+              <div>
+                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Choose Your Clinic</h2>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '28px' }}>Select where you would like to visit Dr. Praveen</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {CLINICS.map(c => (
+                    <div key={c.id} onClick={() => { setClinic(c.id); setStep(2); }}
+                      style={{ border: `2px solid ${clinic === c.id ? '#0B7B6F' : '#E2EEEC'}`, borderRadius: '14px', padding: '20px', cursor: 'pointer', transition: 'all 0.2s', background: clinic === c.id ? '#E6F4F2' : '#fff' }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = '#0B7B6F'}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = clinic === c.id ? '#0B7B6F' : '#E2EEEC'}
+                    >
+                      <div style={{ fontWeight: '700', color: '#0A1628', marginBottom: '4px' }}>{c.name}</div>
+                      <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '6px' }}>{c.address}</div>
+                      <div style={{ fontSize: '12px', color: '#0B7B6F', fontWeight: '600' }}> {c.timings.join(' · ')}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Step 2 — Details */}
+            {step === 2 && (
+              <div>
+                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Your Details</h2>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '28px' }}>Clinic: <strong style={{ color: '#0B7B6F' }}>{clinicObj?.name}</strong></p>
+                {[
+                  { label: 'Full Name *', key: 'name', type: 'text', placeholder: 'Enter your full name' },
+                  { label: 'Phone Number *', key: 'phone', type: 'tel', placeholder: '10-digit mobile number' },
+                  { label: 'Email Address', key: 'email', type: 'email', placeholder: 'Enter your email address' },
+                { label: 'Place', key: 'place', type: 'place', placeholder: 'Enter your address' },
+                  
+                ].map(f => (
+                    
+                  <div key={f.key} style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>{f.label}</label>
+                    <input type={f.type} placeholder={f.placeholder} value={form[f.key]} maxLength={f.key === 'phone' ? 10 : undefined}
+                      onChange={e => setForm(p => ({...p, [f.key]: e.target.value}))}
+                      style={{ width: '100%', padding: '13px 16px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none' }}
+                      onFocus={e => e.target.style.borderColor = '#0B7B6F'}
+                      onBlur={e => e.target.style.borderColor = '#E2EEEC'}
+                    />
+                  </div>
+                ))}
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>Reason for Visit *</label>
+                  <select value={form.reason} onChange={e => setForm(p => ({...p, reason: e.target.value}))}
+                    style={{ width: '100%', padding: '13px 16px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none', background: '#fff' }}
+                    onFocus={e => e.target.style.borderColor = '#0B7B6F'}
+                    onBlur={e => e.target.style.borderColor = '#E2EEEC'}
+                  >
+                    <option value="">Select reason...</option>
+                    {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+                {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '16px' }}>⚠️ {error}</p>}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => setStep(1)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
+                  <button onClick={() => { if (!form.name || !form.phone || !form.reason) { setError('Please fill all fields'); return; } setError(''); setStep(3); }} className="btn-primary" style={{ flex: 2 }}>Continue →</button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3 — Confirm */}
+            {step === 3 && (
+              <div>
+                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '24px' }}>Confirm Details</h2>
+                {[['Clinic', clinicObj?.name], ['Name', form.name], ['Phone', form.phone], ['Reason', form.reason], ['Doctor', form.doctor]].map(([label, val]) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #E2EEEC', fontSize: '14px' }}>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>{label}</span>
+                    <span style={{ color: '#0A1628', fontWeight: '700' }}>{val}</span>
+                  </div>
+                ))}
+                <p style={{ color: '#64748B', fontSize: '13px', margin: '20px 0', lineHeight: '1.6' }}> You will receive an SMS with your token number and a live tracking link on <strong>{form.phone}</strong></p>
+                {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>⚠️ {error}</p>}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => setStep(2)} className="btn-secondary" style={{ flex: 1 }}>← Edit</button>
+                  <button onClick={generateToken} disabled={loading} className="btn-primary" style={{ flex: 2, opacity: loading ? 0.7 : 1 }}>
+                    {loading ? '⏳ Generating...' : ' Generate My Token'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4 — Success */}
+            {step === 4 && token && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ background: 'linear-gradient(135deg,#0B7B6F,#096358)', borderRadius: '20px', padding: '32px', marginBottom: '24px' }}>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '8px' }}>Your Queue Token</div>
+                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '80px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>#{String(token).padStart(2,'0')}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', marginTop: '8px' }}>{clinicObj?.name}</div>
+                </div>
+                <div style={{ background: '#E6F4F2', borderRadius: '14px', padding: '16px', marginBottom: '20px' }}>
+                  <p style={{ fontSize: '14px', color: '#0A1628', fontWeight: '600' }}> SMS sent to {form.phone}</p>
+                  <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>Your token number and live tracking link have been sent.</p>
+                </div>
+                <a href={`/track?phone=${form.phone}`} className="btn-primary" style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', textDecoration: 'none' }}> Track My Position Live</a>
+                <button onClick={() => { setStep(1); setToken(null); setForm({ name:'',phone:'',doctor:'Dr. Praveen Ramachandra',reason:'' }); setClinic(''); }} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Book Another Token</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}                 

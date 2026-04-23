@@ -1,0 +1,165 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { db } from '../firebase/config'
+import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp } from 'firebase/firestore'
+import { CLINICS, DOCTOR } from '../data/content'
+
+export default function DoctorDashboard() {
+  const nav = useNavigate()
+  const [clinic, setClinic]     = useState('diaplus')
+  const [patients, setPatients] = useState([])
+  const today = new Date().toDateString()
+
+  useEffect(() => {
+    if (localStorage.getItem('drp_role') !== 'doctor') nav('/login')
+  }, [])
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'patients'),
+      where('date', '==', today),
+      where('clinicId', '==', clinic)
+    )
+    return onSnapshot(q, snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      list.sort((a, b) => a.tokenNumber - b.tokenNumber)
+      setPatients(list)
+    })
+  }, [clinic])
+
+  async function markDone(id) {
+    await updateDoc(doc(db, 'patients', id), { status: 'done', doneAt: Timestamp.now() })
+  }
+
+  function logout() { localStorage.removeItem('drp_role'); nav('/login') }
+
+  const serving   = patients.find(p => p.status === 'serving')
+  const waiting   = patients.filter(p => p.status === 'waiting')
+  const completed = patients.filter(p => p.status === 'done')
+  const revenue   = completed.length * 500
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F8FAFA', fontFamily: "'DM Sans',sans-serif" }}>
+
+      {/* Topbar */}
+      <div style={{ background: 'linear-gradient(135deg,#0B7B6F,#096358)', padding: '0 5%', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cormorant Garamond',serif", fontWeight: '700', color: '#fff', fontSize: '14px' }}>PR</div>
+          <div>
+            <div style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>Doctor Dashboard</div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>{DOCTOR.name} · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <a href="/" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', textDecoration: 'none' }}>← Website</a>
+          <button onClick={logout} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: "'DM Sans',sans-serif" }}>🔒 Logout</button>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '28px 5%' }}>
+
+        {/* Clinic tabs */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+          {CLINICS.map(c => (
+            <button key={c.id} onClick={() => setClinic(c.id)} style={{
+              padding: '10px 20px', borderRadius: '30px', cursor: 'pointer',
+              fontFamily: "'DM Sans',sans-serif", fontSize: '13px', fontWeight: '600',
+              background: clinic === c.id ? '#0B7B6F' : '#fff',
+              color: clinic === c.id ? '#fff' : '#64748B',
+              border: `2px solid ${clinic === c.id ? '#0B7B6F' : '#E2EEEC'}`,
+              transition: 'all 0.2s',
+            }}>{c.id === 'diaplus' ? '🏥 Diaplus' : '🏥 Thyroplus'}</button>
+          ))}
+        </div>
+
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '14px', marginBottom: '24px' }}>
+          {[
+            ['MY QUEUE',        waiting.length,                 '#0B7B6F'],
+            ['COMPLETED',       completed.length,               '#10B981'],
+            ['WAITING',         waiting.length,                 '#F59E0B'],
+            ['REVENUE TODAY',   `₹${revenue.toLocaleString()}`, '#C9A84C'],
+          ].map(([label, val, color]) => (
+            <div key={label} style={{ background: '#fff', borderRadius: '16px', padding: '20px', border: '1px solid #E2EEEC', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', textAlign: 'center' }}>
+              <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>{label}</div>
+              <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '36px', fontWeight: '700', color, lineHeight: '1' }}>{val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Current patient */}
+        <div style={{ background: '#fff', borderRadius: '20px', padding: '28px', border: '1px solid #E2EEEC', boxShadow: '0 4px 24px rgba(11,123,111,0.08)', marginBottom: '20px' }}>
+          <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '16px' }}>CURRENT PATIENT</div>
+
+          {serving ? (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg,#E6F4F2,#B2DDD8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cormorant Garamond',serif", fontSize: '24px', fontWeight: '700', color: '#0B7B6F', flexShrink: 0 }}>
+                  #{String(serving.tokenNumber).padStart(2,'0')}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '20px', fontWeight: '700', color: '#0A1628', fontFamily: "'Cormorant Garamond',serif" }}>{serving.name}</div>
+                  <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>📞 {serving.phone}</div>
+                </div>
+                <span style={{ background: '#FEF3C7', color: '#92400E', padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>🔔 Now Consulting</span>
+              </div>
+              <div style={{ background: '#F8FAFA', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid #E2EEEC' }}>
+                <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Reason for Visit</div>
+                <div style={{ fontSize: '15px', color: '#0A1628', fontWeight: '600' }}>{serving.reason}</div>
+              </div>
+              <button onClick={() => markDone(serving.id)} style={{ background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', border: 'none', padding: '14px 28px', borderRadius: '10px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: '14px', fontWeight: '700', width: '100%' }}>
+                ✓ Mark Consultation Done
+              </button>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: '#94A3B8' }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>👨‍⚕️</div>
+              <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '6px' }}>No active consultation</div>
+              <div style={{ fontSize: '13px' }}>Use "Call Next" from Admin panel to start</div>
+            </div>
+          )}
+        </div>
+
+        {/* Waiting list */}
+        {waiting.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #E2EEEC', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', marginBottom: '20px' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2EEEC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#0A1628' }}>Patients Waiting</div>
+              <span style={{ background: '#E6F4F2', color: '#0B7B6F', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{waiting.length} waiting</span>
+            </div>
+            {waiting.map((p, i) => (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 20px', borderBottom: i < waiting.length - 1 ? '1px solid #F8FAFA' : 'none' }}>
+                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '22px', fontWeight: '700', color: '#0B7B6F', width: '40px' }}>#{String(p.tokenNumber).padStart(2,'0')}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#0A1628' }}>{p.name}</div>
+                  <div style={{ fontSize: '12px', color: '#64748B' }}>{p.reason}</div>
+                </div>
+                <span style={{ fontSize: '11px', color: '#0B7B6F', fontWeight: '600' }}>~{(i + 1) * 10} mins wait</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Summary */}
+        <div style={{ background: 'linear-gradient(135deg,#0A1628,#0F2040)', borderRadius: '20px', padding: '28px' }}>
+          <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff', marginBottom: '20px' }}>📊 My Summary Today</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '12px' }}>
+            {[
+              ['Total Patients',      patients.filter(p => p.status !== 'removed').length, '#fff'],
+              ['Consultations Done',  completed.length,          '#10B981'],
+              ['Still Waiting',       waiting.length,            '#F59E0B'],
+              ['Revenue Today',       `₹${revenue.toLocaleString()}`, '#C9A84C'],
+              ['Avg Queue Wait',      `${waiting.length * 10}m`, 'rgba(255,255,255,0.7)'],
+              ['Completion Rate',     patients.filter(p=>p.status!=='removed').length > 0 ? `${Math.round((completed.length / patients.filter(p=>p.status!=='removed').length)*100)}%` : '0%', '#0FA898'],
+            ].map(([label, val, color]) => (
+              <div key={label} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>{label}</div>
+                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color, lineHeight: '1' }}>{val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
