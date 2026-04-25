@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { collection, addDoc, query, where, getDocs, Timestamp } from 'firebase/firestore'
-import { db } from '../firebase/config'
 import { CLINICS, DOCTOR } from '../data/content'
+import { apiFetch } from '../utils/api'
+import { createPaymentOrder, verifyPayment, simulateRazorpayPayment } from '../utils/payment'
 
 const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
 
@@ -22,25 +22,102 @@ export default function Queue() {
   const [token, setToken]   = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]   = useState('')
+  
+  // Payment states
+  const [paymentOrder, setPaymentOrder] = useState(null)
+  const [paymentStatus, setPaymentStatus] = useState(null) // 'processing', 'success', 'failed'
 
-  async function generateToken() {
+  /**
+   * Create payment order before showing payment screen
+   */
+  async function createOrder() {
     if (!form.name || !form.phone || !form.reason) { setError('Please fill all fields'); return }
     if (form.phone.length < 10) { setError('Enter a valid 10-digit phone number'); return }
+    
     setLoading(true); setError('')
     try {
-      const today = new Date().toDateString()
-      const q = query(collection(db, 'patients'), where('clinicId', '==', clinic), where('date', '==', today))
-      const snap = await getDocs(q)
-      const tokenNum = snap.size + 1
-      await addDoc(collection(db, 'patients'), {
-        ...form, clinicId: clinic, tokenNumber: tokenNum,
-        status: 'waiting', date: today,
-        createdAt: Timestamp.now(), payment: false, consultationFee: 500,
+      const orderData = await createPaymentOrder(500) // ₹500 consultation fee
+      setPaymentOrder(orderData)
+      setStep(4) // Go to payment screen
+    } catch (e) {
+      console.error('[CREATE ORDER ERROR]', e)
+      setError(e.message || 'Failed to create order. Please try again.')
+    }
+    setLoading(false)
+  }
+
+  /**
+   * Simulate payment and verify with backend
+   */
+  async function processPayment() {
+    setPaymentStatus('processing')
+    setError('')
+    setLoading(true)
+    
+    try {
+      // Simulate Razorpay payment (1-2 second delay, 10% failure rate)
+      const paymentDetails = await simulateRazorpayPayment(paymentOrder.orderId)
+      
+      // Verify payment with backend
+      const verifyResult = await verifyPayment(paymentDetails)
+      
+      if (verifyResult.success) {
+        setPaymentStatus('success')
+        // Proceed to token generation after 1.5 second delay to show success message
+        setTimeout(() => generateToken(), 1500)
+      } else {
+        setPaymentStatus('failed')
+        setError(verifyResult.message || 'Payment verification failed. Please try again.')
+        setLoading(false)
+      }
+    } catch (e) {
+      console.error('[PAYMENT ERROR]', e)
+      setPaymentStatus('failed')
+      setError(e.message || 'Payment processing failed. Please try again.')
+      setLoading(false)
+    }
+  }
+
+  /**
+   * Retry failed payment
+   */
+  function retryPayment() {
+    setPaymentStatus(null)
+    setError('')
+    setLoading(false)
+  }
+
+  /**
+   * Generate token after successful payment
+   */
+  async function generateToken() {
+    setLoading(true); setError('')
+    try {
+      // Call backend API to generate token
+      const response = await apiFetch('/api/queue/add', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          reason: form.reason,
+          clinic: clinic
+        })
       })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        setError(result.message || 'Failed to generate token. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      const tokenNum = result.data.tokenNumber
       await sendSMS(form.phone, form.name, tokenNum, clinic)
       setToken(tokenNum)
-      setStep(4)
+      setStep(5) // Final success screen
     } catch (e) {
+      console.error('[TOKEN GENERATION ERROR]', e)
       setError('Something went wrong. Please try again.')
     }
     setLoading(false)
@@ -63,13 +140,13 @@ export default function Queue() {
         </div>
 
         {/* Progress */}
-        {step < 4 && (
+        {step < 5 && (
           <div style={{ background: '#fff', borderBottom: '1px solid #E2EEEC', padding: '16px 5%', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
-            {['Choose Clinic','Your Details','Confirm'].map((s, i) => (
+            {['Choose Clinic','Your Details','Confirm','Payment'].map((s, i) => (
               <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: step > i + 1 ? '#0B7B6F' : step === i + 1 ? '#0B7B6F' : '#E2EEEC', color: step >= i + 1 ? '#fff' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>{step > i + 1 ? '' : i + 1}</div>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: step > i + 1 ? '#0B7B6F' : step === i + 1 ? '#0B7B6F' : '#E2EEEC', color: step >= i + 1 ? '#fff' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>{step > i + 1 ? '✓' : i + 1}</div>
                 <span style={{ fontSize: '13px', fontWeight: step === i + 1 ? '700' : '400', color: step === i + 1 ? '#0A1628' : '#64748B' }}>{s}</span>
-                {i < 2 && <span style={{ color: '#E2EEEC', fontSize: '16px' }}>›</span>}
+                {i < 3 && <span style={{ color: '#E2EEEC', fontSize: '16px' }}>›</span>}
               </div>
             ))}
           </div>
@@ -155,15 +232,96 @@ export default function Queue() {
                 {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>⚠️ {error}</p>}
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={() => setStep(2)} className="btn-secondary" style={{ flex: 1 }}>← Edit</button>
-                  <button onClick={generateToken} disabled={loading} className="btn-primary" style={{ flex: 2, opacity: loading ? 0.7 : 1 }}>
-                    {loading ? '⏳ Generating...' : ' Generate My Token'}
+                  <button onClick={createOrder} disabled={loading} className="btn-primary" style={{ flex: 2, opacity: loading ? 0.7 : 1 }}>
+                    {loading ? '⏳ Processing...' : ' Proceed to Payment'}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Step 4 — Success */}
-            {step === 4 && token && (
+            {/* Step 4 — Payment */}
+            {step === 4 && paymentOrder && !token && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ marginBottom: '24px' }}>
+                  <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '26px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Confirm Payment</h2>
+                  <p style={{ color: '#64748B', fontSize: '14px' }}>Consultation Fee</p>
+                </div>
+
+                {/* Amount */}
+                <div style={{ background: '#F8FAFA', borderRadius: '14px', padding: '24px', marginBottom: '24px', border: '1px solid #E2EEEC' }}>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>Amount to Pay</div>
+                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '48px', fontWeight: '800', color: '#0B7B6F', lineHeight: '1' }}>₹{paymentOrder.amount}</div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '8px' }}>Order ID: {paymentOrder.orderId}</div>
+                </div>
+
+                {/* Status Messages */}
+                {paymentStatus === 'processing' && (
+                  <div style={{ background: '#E6F4F2', borderRadius: '12px', padding: '20px', marginBottom: '24px', border: '1px solid #0B7B6F' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#0B7B6F', marginBottom: '8px' }}>⏳ Processing Payment...</div>
+                    <div style={{ fontSize: '12px', color: '#0A1628', marginBottom: '12px' }}>Securely processing your payment. Please do not close this page.</div>
+                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0B7B6F', animation: 'pulse 1.4s infinite' }} />
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0B7B6F', animation: 'pulse 1.4s infinite 0.2s' }} />
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0B7B6F', animation: 'pulse 1.4s infinite 0.4s' }} />
+                    </div>
+                    <style>{`
+                      @keyframes pulse {
+                        0%, 100% { opacity: 0.3; }
+                        50% { opacity: 1; }
+                      }
+                    `}</style>
+                  </div>
+                )}
+
+                {paymentStatus === 'success' && (
+                  <div style={{ background: '#E6F4F2', borderRadius: '12px', padding: '20px', marginBottom: '24px', border: '1px solid #0B7B6F' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#0B7B6F', marginBottom: '4px' }}>✓ Payment Successful!</div>
+                    <div style={{ fontSize: '12px', color: '#0A1628', marginTop: '4px' }}>Generating your token...</div>
+                  </div>
+                )}
+
+                {paymentStatus === 'failed' && (
+                  <div style={{ background: '#FEE2E2', borderRadius: '12px', padding: '20px', marginBottom: '24px', border: '1px solid #DC2626' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#DC2626', marginBottom: '4px' }}>✗ Payment Failed</div>
+                    <div style={{ fontSize: '12px', color: '#991B1B', marginTop: '4px', marginBottom: '12px' }}>{error || 'Payment could not be processed. Please try again.'}</div>
+                    <div style={{ fontSize: '11px', color: '#7F1D1D', fontStyle: 'italic' }}>This is a mock payment. In production, contact support if issues persist.</div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                {!paymentStatus && (
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={() => { setStep(3); setPaymentOrder(null); }} className="btn-secondary" style={{ flex: 1 }}>← Cancel</button>
+                    <button onClick={processPayment} disabled={loading} className="btn-primary" style={{ flex: 2, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
+                      {loading ? ' Processing...' : ' Pay Now'}
+                    </button>
+                  </div>
+                )}
+
+                {paymentStatus === 'failed' && (
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={() => { setStep(3); setPaymentOrder(null); setPaymentStatus(null); }} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
+                    <button onClick={retryPayment} className="btn-primary" style={{ flex: 2 }}>Retry Payment</button>
+                  </div>
+                )}
+
+                {paymentStatus === 'processing' && (
+                  <div style={{ textAlign: 'center', color: '#64748B', fontSize: '13px', padding: '16px' }}>
+                    <p>Your payment is being processed securely...</p>
+                    <p style={{ fontSize: '11px', marginTop: '8px', fontStyle: 'italic' }}>This may take a few moments</p>
+                  </div>
+                )}
+
+                {paymentStatus === 'success' && (
+                  <div style={{ textAlign: 'center', color: '#0B7B6F', fontSize: '13px', padding: '16px' }}>
+                    <p>Your payment has been confirmed. Creating your token...</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 5 — Success */}
+            {step === 5 && token && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ background: 'linear-gradient(135deg,#0B7B6F,#096358)', borderRadius: '20px', padding: '32px', marginBottom: '24px' }}>
                   <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '8px' }}>Your Queue Token</div>
@@ -175,7 +333,7 @@ export default function Queue() {
                   <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>Your token number and live tracking link have been sent.</p>
                 </div>
                 <a href={`/track?phone=${form.phone}`} className="btn-primary" style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', textDecoration: 'none' }}> Track My Position Live</a>
-                <button onClick={() => { setStep(1); setToken(null); setForm({ name:'',phone:'',doctor:'Dr. Praveen Ramachandra',reason:'' }); setClinic(''); }} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Book Another Token</button>
+                <button onClick={() => { setStep(1); setToken(null); setPaymentOrder(null); setPaymentStatus(null); setForm({ name:'',phone:'',doctor:'Dr. Praveen Ramachandra',reason:'' }); setClinic(''); }} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Book Another Token</button>
               </div>
             )}
           </div>

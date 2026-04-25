@@ -1,21 +1,71 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DOCTOR } from '../data/content'
-
-const ADMIN_PIN  = '1234'
-const DOCTOR_PIN = '5678'
+import { apiFetch } from '../utils/api'
 
 export default function Login() {
-  const [role, setRole]   = useState('admin')
-  const [pin, setPin]     = useState('')
-  const [error, setError] = useState('')
-  const navigate = useNavigate()
+  const [role, setRole]       = useState('admin')
+  const [pin, setPin]         = useState('')
+  const [error, setError]     = useState('')
+  const [loading, setLoading] = useState(false)
+  const navigate              = useNavigate()
 
-  function login() {
-    if (role === 'admin'  && pin === ADMIN_PIN)  { localStorage.setItem('drp_role','admin');  navigate('/admin'); return }
-    if (role === 'doctor' && pin === DOCTOR_PIN) { localStorage.setItem('drp_role','doctor'); navigate('/doctor'); return }
-    setError('Incorrect PIN. Please try again.')
-    setPin('')
+  /**
+   * Handle login - send credentials to backend API
+   * Uses role as username and PIN as password
+   */
+  async function handleLogin() {
+    try {
+      // Reset previous errors
+      setError('')
+      setLoading(true)
+
+      // Validate input
+      if (!pin || pin.length === 0) {
+        setError('Please enter your PIN')
+        setLoading(false)
+        return
+      }
+
+      // Send login request to backend
+      const response = await apiFetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: role,
+          password: pin
+        })
+      })
+
+      const data = await response.json()
+
+      // Check if login was successful
+      if (!response.ok) {
+        setError(data.message || 'Invalid credentials. Please try again.')
+        setPin('')
+        setLoading(false)
+        return
+      }
+
+      // Store token and role in localStorage
+      if (data.token) {
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('drp_role', role)
+        localStorage.setItem('username', role)
+
+        // Redirect to appropriate dashboard
+        const dashboardRoute = role === 'admin' ? '/admin' : '/doctor'
+        navigate(dashboardRoute)
+      } else {
+        setError('Login failed. No token received.')
+        setPin('')
+      }
+    } catch (err) {
+      console.error('[LOGIN ERROR]', err)
+      setError('Network error. Please check your connection and try again.')
+      setPin('')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -45,9 +95,15 @@ export default function Login() {
           {/* PIN */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>Enter PIN</label>
-            <input type="password" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()}
-              placeholder="Enter your 4-digit PIN" maxLength={6}
-              style={{ width: '100%', padding: '14px 16px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '18px', letterSpacing: '6px', fontFamily: "'DM Sans',sans-serif", outline: 'none', textAlign: 'center' }}
+            <input 
+              type="password" 
+              value={pin} 
+              onChange={e => setPin(e.target.value)} 
+              onKeyDown={e => e.key === 'Enter' && !loading && handleLogin()}
+              placeholder="Enter your 4-digit PIN" 
+              maxLength={6}
+              disabled={loading}
+              style={{ width: '100%', padding: '14px 16px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '18px', letterSpacing: '6px', fontFamily: "'DM Sans',sans-serif", outline: 'none', textAlign: 'center', opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'text' }}
               onFocus={e => e.target.style.borderColor = '#0B7B6F'}
               onBlur={e => e.target.style.borderColor = '#E2EEEC'}
             />
@@ -55,8 +111,12 @@ export default function Login() {
 
           {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '16px', textAlign: 'center' }}> {error}</p>}
 
-          <button onClick={login} className="btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: '15px', padding: '14px' }}>
-             Login Securely
+          <button 
+            onClick={handleLogin} 
+            disabled={loading}
+            className="btn-primary" 
+            style={{ width: '100%', justifyContent: 'center', fontSize: '15px', padding: '14px', opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
+            {loading ? 'Verifying...' : 'Login Securely'}
           </button>
 
           <p style={{ textAlign: 'center', fontSize: '12px', color: '#64748B', marginTop: '20px' }}>

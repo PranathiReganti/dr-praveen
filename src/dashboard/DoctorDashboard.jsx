@@ -3,16 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase/config'
 import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp } from 'firebase/firestore'
 import { CLINICS, DOCTOR } from '../data/content'
+import { useAuth } from '../hooks/useAuth'
 
 export default function DoctorDashboard() {
   const nav = useNavigate()
+  
+  // Protect route with authentication - requires 'doctor' role
+  const { logout, isAuthenticated } = useAuth('doctor')
+  
   const [clinic, setClinic]     = useState('diaplus')
   const [patients, setPatients] = useState([])
   const today = new Date().toDateString()
-
-  useEffect(() => {
-    if (localStorage.getItem('drp_role') !== 'doctor') nav('/login')
-  }, [])
 
   useEffect(() => {
     const q = query(
@@ -31,7 +32,7 @@ export default function DoctorDashboard() {
     await updateDoc(doc(db, 'patients', id), { status: 'done', doneAt: Timestamp.now() })
   }
 
-  function logout() { localStorage.removeItem('drp_role'); nav('/login') }
+  // logout function provided by useAuth hook
 
   const serving   = patients.find(p => p.status === 'serving')
   const waiting   = patients.filter(p => p.status === 'waiting')

@@ -3,20 +3,21 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, Timestamp
 import { db } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
 import { CLINICS } from '../data/content'
+import { useAuth } from '../hooks/useAuth'
 
 const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
+  
+  // Protect route with authentication - requires 'admin' role
+  const { logout, isAuthenticated } = useAuth('admin')
+  
   const [patients, setPatients]     = useState([])
   const [clinicId, setClinicId]     = useState('diaplus')
   const [showAdd, setShowAdd]       = useState(false)
   const [form, setForm]             = useState({ name: '', phone: '', reason: '' })
   const [adding, setAdding]         = useState(false)
-
-  useEffect(() => {
-    if (localStorage.getItem('drp_role') !== 'admin') navigate('/login')
-  }, [])
 
   useEffect(() => {
     const today = new Date().toDateString()
@@ -62,7 +63,7 @@ export default function AdminDashboard() {
     await updateDoc(doc(db, 'patients', id), { status: 'removed' })
   }
 
-  function logout() { localStorage.removeItem('drp_role'); navigate('/login') }
+  // logout function provided by useAuth hook
 
   const S = { label: { fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' } }
 
