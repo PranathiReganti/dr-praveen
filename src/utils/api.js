@@ -7,78 +7,60 @@ import { getConfig } from '../config/environment'
 
 const { API_BASE_URL, API_TIMEOUT } = getConfig()
 
+if (!API_BASE_URL) {
+  console.error("API base URL not configured. Please set VITE_API_BASE_URL in your environment variables.")
+}
+
 /**
  * Enhanced fetch function with automatic JWT authentication
  * @param {string} url - API endpoint URL
  * @param {Object} options - Fetch options (method, body, headers, etc.)
  * @returns {Promise<Response>} - Fetch response object
- * 
- * @example
- * // Unauthenticated request
- * const response = await apiFetch('/api/queue')
- * 
- * // Authenticated request - token automatically added
- * const response = await apiFetch('/api/admin/dashboard', {
- *   method: 'GET'
- * })
- * 
- * // POST with body
- * const response = await apiFetch('/api/queue/add', {
- *   method: 'POST',
- *   body: JSON.stringify({ name, phone, reason, clinic })
- * })
  */
 export async function apiFetch(url, options = {}) {
-  // Build full URL if not absolute
+  if (!API_BASE_URL) {
+    throw new Error("API base URL not configured.");
+  }
+
   const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`
 
-  // Initialize headers if not present
   const headers = options.headers || {}
 
-  // Set JSON content type by default if not specified
   if (!headers['Content-Type'] && options.method !== 'GET') {
     headers['Content-Type'] = 'application/json'
   }
 
-  // Get token from localStorage and add to Authorization header
   const token = localStorage.getItem('token')
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  // Merge headers with options
   const finalOptions = {
     ...options,
     headers
   }
 
   try {
-    // Create abort controller for timeout
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
 
-    try {
-      const response = await fetch(fullUrl, {
-        ...finalOptions,
-        signal: controller.signal
-      })
-      clearTimeout(timeoutId)
-      return response
-    } catch (error) {
-      clearTimeout(timeoutId)
-      throw error
-    }
+    const response = await fetch(fullUrl, {
+      ...finalOptions,
+      signal: controller.signal
+    })
+    clearTimeout(timeoutId)
+    return response
   } catch (error) {
     if (error.name === 'AbortError') {
       console.error(`[API TIMEOUT] ${fullUrl}: Request exceeded ${API_TIMEOUT}ms`)
       throw new Error(`Request timeout after ${API_TIMEOUT}ms. Please check your connection.`)
     }
-    if (error instanceof TypeError && error.message.includes('fetch')) {
+    if (error instanceof TypeError) { // Catches network errors
       console.error(`[API CONNECTION ERROR] ${fullUrl}:`, error)
-      throw new Error(`Cannot connect to server. Please ensure backend is running on ${API_BASE_URL}`)
+      throw new Error(`Cannot connect to server. Please ensure the backend is running and accessible at ${API_BASE_URL}`)
     }
     console.error(`[API ERROR] ${fullUrl}:`, error)
-    throw error
+    throw new Error('An unexpected error occurred. Please try again.')
   }
 }
 
@@ -91,6 +73,10 @@ export async function apiFetch(url, options = {}) {
  */
 export async function apiFetchJson(url, options = {}) {
   const response = await apiFetch(url, options)
+
+  if (response.status === 204) { // No Content
+    return null;
+  }
   
   let data
   try {
@@ -105,6 +91,7 @@ export async function apiFetchJson(url, options = {}) {
     const error = new Error(errorMessage)
     error.status = response.status
     error.data = data
+    console.error(`[API RESPONSE ERROR] ${url} failed with status ${response.status}:`, data);
     throw error
   }
 
@@ -127,7 +114,9 @@ export async function apiRequest(url, options = {}, onError = null) {
     if (onError) {
       onError(error)
     }
-    return null
+    // It's often better to let the caller handle the error state,
+    // so re-throwing or returning a specific error object might be preferable to returning null.
+    throw error;
   }
 }
 

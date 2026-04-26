@@ -11,7 +11,7 @@ const config = {
     API_TIMEOUT: 30000, // 30 seconds
   },
   production: {
-    API_BASE_URL: 'https://dr-praveen.onrender.com',
+    API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://dr-praveen.onrender.com',
     API_TIMEOUT: 30000,
   },
   staging: {
