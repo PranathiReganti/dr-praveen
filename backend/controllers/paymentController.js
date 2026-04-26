@@ -87,20 +87,24 @@ export const verifyPaymentRazorpay = async (req, res) => {
       })
     }
 
-    // Simulate occasional backend verification failures (5% chance) for realistic demo
-    const randomValue = Math.random() * 100
-    if (randomValue < 5) {
-      console.log('[SIMULATED VERIFICATION FAILURE]', {
-        orderId,
-        paymentId,
-        reason: 'Backend verification timeout'
-      })
-      
-      return res.status(500).json({
-        error: 'Verification Failed',
-        message: 'Payment verification service temporarily unavailable. Please retry.',
-        success: false
-      })
+    // Optional simulation of occasional backend verification failures.
+    // Keep demos deterministic by default: enable only when explicitly requested.
+    const simulateFailures = (process.env.SIMULATE_PAYMENT_FAILURES || 'false').toLowerCase() === 'true'
+    if (simulateFailures) {
+      const randomValue = Math.random() * 100
+      if (randomValue < 5) {
+        console.log('[SIMULATED VERIFICATION FAILURE]', {
+          orderId,
+          paymentId,
+          reason: 'Backend verification timeout'
+        })
+        
+        return res.status(500).json({
+          error: 'Verification Failed',
+          message: 'Payment verification service temporarily unavailable. Please retry.',
+          success: false
+        })
+      }
     }
 
     // TODO: Replace with real Razorpay signature verification

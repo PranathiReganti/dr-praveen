@@ -11,6 +11,45 @@ let currentServingToken = null
 console.log('[MODULE INIT] queueController loaded: nextTokenNumber =', nextTokenNumber, ', queueArray.length =', queueArray.length)
 
 /**
+ * Seed initial queue data for demos so UI is never empty.
+ * Only seeds when queue is currently empty.
+ */
+export const seedDemoQueue = () => {
+  const shouldSeed = (process.env.DEMO_SEED_QUEUE || 'true').toLowerCase() !== 'false'
+  if (!shouldSeed) return { seeded: false, reason: 'disabled' }
+
+  if (queueArray.length > 0) {
+    return { seeded: false, reason: 'already_has_data', count: queueArray.length }
+  }
+
+  const now = Date.now()
+  const demoPatients = [
+    { name: 'Aarav Sharma', phone: '9876543210', reason: 'Fever and body ache', clinic: 'general' },
+    { name: 'Meera Iyer', phone: '9123456780', reason: 'Follow-up consultation', clinic: 'general' },
+    { name: 'Rohan Verma', phone: '9988776655', reason: 'Stomach pain', clinic: 'general' },
+    { name: 'Neha Gupta', phone: '9012345678', reason: 'Skin allergy', clinic: 'general' }
+  ]
+
+  queueArray = demoPatients.map((p, idx) => ({
+    tokenNumber: idx + 1,
+    ...p,
+    timestamp: new Date(now - (demoPatients.length - idx) * 60_000).toISOString(),
+    status: idx === 0 ? 'serving' : 'waiting'
+  }))
+
+  currentServingToken = queueArray[0]
+  nextTokenNumber = queueArray.length + 1
+
+  console.log('[DEMO SEED] Preloaded queue tokens:', {
+    count: queueArray.length,
+    serving: currentServingToken.tokenNumber,
+    nextTokenNumber
+  })
+
+  return { seeded: true, count: queueArray.length, serving: currentServingToken.tokenNumber }
+}
+
+/**
  * Get current queue data
  * Returns real queue status with sequential tokens
  * @param {Object} req - Express request object
@@ -29,11 +68,20 @@ export const getQueueData = async (req, res) => {
     const serving = currentServingToken || queueArray.find(token => token.status === 'serving')
     const currentToken = serving ? serving.tokenNumber : (queueArray.length > 0 ? queueArray[0].tokenNumber : 0)
 
+    const patients = queueArray.map(p => ({
+      tokenNumber: p.tokenNumber,
+      name: p.name,
+      phone: p.phone,
+      clinic: p.clinic,
+      status: p.status,
+      reason: p.reason
+    }))
+
     const queueData = {
       currentToken,
       waiting: waitingCount,
       estimatedTime: `${estimatedTime} mins`,
-      lastUpdated: new Date().toISOString()
+      patients
     }
 
     console.log('[QUEUE STATUS]', {
@@ -133,10 +181,56 @@ export const addToken = async (req, res) => {
  */
 export const bookToken = async (req, res) => {
   try {
-    // TODO: Implement token booking logic
-    res.status(201).json({ message: 'Token booked successfully' })
+    // For this project, "book token" is the same as creating a new token entry.
+    // Keep a dedicated endpoint for frontend compatibility.
+    const { name, phone, reason, clinic } = req.body
+
+    if (!name || !phone || !reason || !clinic) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'name, phone, reason, and clinic are required',
+        required: ['name', 'phone', 'reason', 'clinic']
+      })
+    }
+
+    const tokenNumber = nextTokenNumber++
+
+    const tokenData = {
+      tokenNumber,
+      name,
+      phone,
+      reason,
+      clinic,
+      timestamp: new Date().toISOString(),
+      status: 'waiting'
+    }
+
+    queueArray.push(tokenData)
+
+    console.log('[TOKEN BOOKED]', {
+      tokenNumber,
+      patient: name,
+      clinic,
+      totalInQueue: queueArray.length
+    })
+
+    res.status(201).json({
+      success: true,
+      data: {
+        tokenNumber,
+        clinic,
+        patient: name,
+        phone,
+        reason
+      },
+      message: 'Token booked successfully'
+    })
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    console.error('[BOOK TOKEN ERROR]', error)
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message
+    })
   }
 }
 
@@ -344,6 +438,75 @@ export const completeConsultation = async (req, res) => {
   } catch (error) {
     console.error('[COMPLETE CONSULTATION ERROR]', error)
     res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message
+    })
+  }
+}
+
+/**
+ * Complete consultation by token number (route param)
+ * PATCH /api/queue/complete/:tokenNumber
+ */
+export const completeConsultationByTokenNumber = async (req, res) => {
+  try {
+    const tokenNumber = Number(req.params.tokenNumber)
+
+    if (!tokenNumber || Number.isNaN(tokenNumber)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'tokenNumber must be a number'
+      })
+    }
+
+    const token = queueArray.find(t => t.tokenNumber === tokenNumber)
+
+    if (!token) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Token not found'
+      })
+    }
+
+    if (token.status === 'serving') {
+      token.status = 'done'
+      if (currentServingToken && currentServingToken.tokenNumber === tokenNumber) {
+        currentServingToken = null
+      }
+    }
+
+    const waitingCount = queueArray.filter(t => t.status === 'waiting').length
+    const estimatedTime = waitingCount * 5
+    const serving = currentServingToken || queueArray.find(t => t.status === 'serving')
+    const currentToken = serving ? serving.tokenNumber : (queueArray.length > 0 ? queueArray[0].tokenNumber : 0)
+
+    const patients = queueArray.map(p => ({
+      tokenNumber: p.tokenNumber,
+      name: p.name,
+      phone: p.phone,
+      clinic: p.clinic,
+      status: p.status,
+      reason: p.reason
+    }))
+
+    console.log('[CONSULTATION COMPLETED]', { tokenNumber })
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        currentToken,
+        waiting: waitingCount,
+        estimatedTime: `${estimatedTime} mins`,
+        patients
+      },
+      message: 'Consultation marked as complete'
+    })
+  } catch (error) {
+    console.error('[COMPLETE CONSULTATION BY TOKEN ERROR]', error)
+    res.status(500).json({
+      success: false,
       error: 'Internal Server Error',
       message: error.message
     })

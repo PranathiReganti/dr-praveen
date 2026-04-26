@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { db } from '../firebase/config'
-import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp } from 'firebase/firestore'
 import { CLINICS, DOCTOR } from '../data/content'
 import { useAuth } from '../hooks/useAuth'
 
@@ -12,31 +10,63 @@ export default function DoctorDashboard() {
   const { logout, isAuthenticated } = useAuth('doctor')
   
   const [clinic, setClinic]     = useState('diaplus')
-  const [patients, setPatients] = useState([])
+  const [queueData, setQueueData] = useState(null)
+  const [queueLoading, setQueueLoading] = useState(true)
+  const [completeLoading, setCompleteLoading] = useState(false)
   const today = new Date().toDateString()
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'patients'),
-      where('date', '==', today),
-      where('clinicId', '==', clinic)
-    )
-    return onSnapshot(q, snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      list.sort((a, b) => a.tokenNumber - b.tokenNumber)
-      setPatients(list)
-    })
-  }, [clinic])
+    let mounted = true
+    let intervalId = null
 
-  async function markDone(id) {
-    await updateDoc(doc(db, 'patients', id), { status: 'done', doneAt: Timestamp.now() })
+    const fetchQueue = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/queue')
+        const json = await res.json()
+        if (!mounted) return
+        setQueueData(json?.data ?? null)
+      } catch {
+        if (!mounted) return
+        setQueueData(null)
+      } finally {
+        if (!mounted) return
+        setQueueLoading(false)
+      }
+    }
+
+    fetchQueue()
+    intervalId = setInterval(fetchQueue, 4000)
+
+    return () => {
+      mounted = false
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [])
+
+  async function markDone(tokenNumber) {
+    if (!tokenNumber) return
+    if (completeLoading) return
+    setCompleteLoading(true)
+    try {
+      const res = await fetch(`http://localhost:5000/api/queue/complete/${tokenNumber}`, {
+        method: 'PATCH'
+      })
+      if (!res.ok) throw new Error('Failed to complete consultation')
+      const json = await res.json()
+      setQueueData(json?.data ?? null)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCompleteLoading(false)
+    }
   }
 
   // logout function provided by useAuth hook
 
-  const serving   = patients.find(p => p.status === 'serving')
-  const waiting   = patients.filter(p => p.status === 'waiting')
-  const completed = patients.filter(p => p.status === 'done')
+  const apiPatients = Array.isArray(queueData?.patients) ? queueData.patients : []
+  const serving   = apiPatients.find(p => p.status === 'serving')
+  const waiting   = apiPatients.filter(p => p.status === 'waiting')
+  const completed = apiPatients.filter(p => p.status === 'done')
   const revenue   = completed.length * 500
 
   return (
@@ -76,9 +106,9 @@ export default function DoctorDashboard() {
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '14px', marginBottom: '24px' }}>
           {[
-            ['MY QUEUE',        waiting.length,                 '#0B7B6F'],
-            ['COMPLETED',       completed.length,               '#10B981'],
-            ['WAITING',         waiting.length,                 '#F59E0B'],
+            ['CURRENTLY SERVING', queueLoading ? '...' : (queueData?.currentToken ?? 0), '#0B7B6F'],
+            ['COMPLETED',         completed.length,                                 '#10B981'],
+            ['PATIENTS WAITING',  queueLoading ? '...' : (queueData?.waiting ?? 0), '#F59E0B'],
             ['REVENUE TODAY',   `₹${revenue.toLocaleString()}`, '#C9A84C'],
           ].map(([label, val, color]) => (
             <div key={label} style={{ background: '#fff', borderRadius: '16px', padding: '20px', border: '1px solid #E2EEEC', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', textAlign: 'center' }}>
@@ -108,8 +138,12 @@ export default function DoctorDashboard() {
                 <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Reason for Visit</div>
                 <div style={{ fontSize: '15px', color: '#0A1628', fontWeight: '600' }}>{serving.reason}</div>
               </div>
-              <button onClick={() => markDone(serving.id)} style={{ background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', border: 'none', padding: '14px 28px', borderRadius: '10px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: '14px', fontWeight: '700', width: '100%' }}>
-                ✓ Mark Consultation Done
+              <button
+                onClick={() => markDone(serving.tokenNumber)}
+                disabled={completeLoading}
+                style={{ background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', border: 'none', padding: '14px 28px', borderRadius: '10px', cursor: completeLoading ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: '14px', fontWeight: '700', width: '100%', opacity: completeLoading ? 0.7 : 1 }}
+              >
+                {completeLoading ? 'Completing...' : '✓ Mark Consultation Done'}
               </button>
             </div>
           ) : (
@@ -146,12 +180,12 @@ export default function DoctorDashboard() {
           <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff', marginBottom: '20px' }}>📊 My Summary Today</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '12px' }}>
             {[
-              ['Total Patients',      patients.filter(p => p.status !== 'removed').length, '#fff'],
+              ['Total Patients',      apiPatients.length, '#fff'],
               ['Consultations Done',  completed.length,          '#10B981'],
               ['Still Waiting',       waiting.length,            '#F59E0B'],
               ['Revenue Today',       `₹${revenue.toLocaleString()}`, '#C9A84C'],
               ['Avg Queue Wait',      `${waiting.length * 10}m`, 'rgba(255,255,255,0.7)'],
-              ['Completion Rate',     patients.filter(p=>p.status!=='removed').length > 0 ? `${Math.round((completed.length / patients.filter(p=>p.status!=='removed').length)*100)}%` : '0%', '#0FA898'],
+              ['Completion Rate',     apiPatients.length > 0 ? `${Math.round((completed.length / apiPatients.length)*100)}%` : '0%', '#0FA898'],
             ].map(([label, val, color]) => (
               <div key={label} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>{label}</div>

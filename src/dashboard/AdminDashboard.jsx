@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react'
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore'
-import { db } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
 import { CLINICS } from '../data/content'
 import { useAuth } from '../hooks/useAuth'
@@ -13,54 +11,98 @@ export default function AdminDashboard() {
   // Protect route with authentication - requires 'admin' role
   const { logout, isAuthenticated } = useAuth('admin')
   
-  const [patients, setPatients]     = useState([])
+  const [queueData, setQueueData]   = useState(null)
+  const [queueLoading, setQueueLoading] = useState(true)
+  const [completeLoading, setCompleteLoading] = useState(false)
   const [clinicId, setClinicId]     = useState('diaplus')
   const [showAdd, setShowAdd]       = useState(false)
   const [form, setForm]             = useState({ name: '', phone: '', reason: '' })
   const [adding, setAdding]         = useState(false)
 
   useEffect(() => {
-    const today = new Date().toDateString()
-    const q = query(collection(db, 'patients'), where('clinicId', '==', clinicId), where('date', '==', today))
-    return onSnapshot(q, snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      list.sort((a,b) => a.tokenNumber - b.tokenNumber)
-      setPatients(list)
-    })
-  }, [clinicId])
+    let mounted = true
+    let intervalId = null
 
-  const waiting   = patients.filter(p => p.status === 'waiting')
-  const serving   = patients.find(p => p.status === 'serving')
-  const completed = patients.filter(p => p.status === 'done')
+    const fetchQueue = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/queue')
+        const json = await res.json()
+        if (!mounted) return
+        setQueueData(json?.data ?? null)
+      } catch {
+        if (!mounted) return
+        setQueueData(null)
+      } finally {
+        if (!mounted) return
+        setQueueLoading(false)
+      }
+    }
+
+    fetchQueue()
+    intervalId = setInterval(fetchQueue, 4000)
+
+    return () => {
+      mounted = false
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [])
+
+  const apiPatients = Array.isArray(queueData?.patients) ? queueData.patients : []
+  const waiting   = apiPatients.filter(p => p.status === 'waiting')
+  const serving   = apiPatients.find(p => p.status === 'serving')
+  const completed = apiPatients.filter(p => p.status === 'done')
   const revenue   = completed.length * 500
 
   async function addPatient() {
     if (!form.name || !form.phone || !form.reason) return
     setAdding(true)
-    const today = new Date().toDateString()
-    const tokenNum = patients.length + 1
-    await addDoc(collection(db, 'patients'), {
-      ...form, clinicId, doctor: 'Dr. Praveen Ramachandra',
-      tokenNumber: tokenNum, status: 'waiting',
-      date: today, createdAt: Timestamp.now(),
-      payment: false, consultationFee: 500,
-    })
+    try {
+      await fetch('http://localhost:5000/api/queue/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          reason: form.reason,
+          clinic: 'general'
+        })
+      })
+    } finally {
+      // next poll will refresh UI
+    }
     setForm({ name:'', phone:'', reason:'' })
     setShowAdd(false)
     setAdding(false)
   }
 
   async function callNext() {
-    if (serving) await updateDoc(doc(db, 'patients', serving.id), { status: 'done' })
-    if (waiting.length > 0) await updateDoc(doc(db, 'patients', waiting[0].id), { status: 'serving', servedAt: Timestamp.now() })
+    await fetch('http://localhost:5000/api/queue/next', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    })
   }
 
   async function markDone() {
-    if (serving) await updateDoc(doc(db, 'patients', serving.id), { status: 'done', doneAt: Timestamp.now() })
+    if (!serving?.tokenNumber) return
+    if (completeLoading) return
+    setCompleteLoading(true)
+    try {
+      const res = await fetch(`http://localhost:5000/api/queue/complete/${serving.tokenNumber}`, {
+        method: 'PATCH'
+      })
+      if (!res.ok) throw new Error('Failed to complete consultation')
+      const json = await res.json()
+      setQueueData(json?.data ?? null)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCompleteLoading(false)
+    }
   }
 
   async function removePatient(id) {
-    await updateDoc(doc(db, 'patients', id), { status: 'removed' })
+    // Not supported by backend demo queue yet (keep UI, no-op)
   }
 
   // logout function provided by useAuth hook
@@ -90,8 +132,8 @@ export default function AdminDashboard() {
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '24px' }}>
           {[
-            { label: 'Total Patients', val: patients.filter(p => p.status !== 'removed').length, color: '#0A1628' },
-            { label: 'In Queue',       val: waiting.length, color: '#F59E0B' },
+            { label: 'Currently Serving', val: queueLoading ? '...' : (queueData?.currentToken ?? 0), color: '#0A1628' },
+            { label: 'Patients Waiting',  val: queueLoading ? '...' : (queueData?.waiting ?? 0), color: '#F59E0B' },
             { label: 'Completed Today',val: completed.length, color: '#0B7B6F' },
             { label: 'Revenue Today',  val: `₹${revenue.toLocaleString()}`, color: '#0B7B6F' },
           ].map(s => (
@@ -115,7 +157,13 @@ export default function AdminDashboard() {
                     <div style={{ fontWeight: '700', color: '#0A1628', marginTop: '4px' }}>{serving.name}</div>
                     <div style={{ fontSize: '12px', color: '#64748B' }}>{serving.reason}</div>
                   </div>
-                  <button onClick={markDone} style={{ width: '100%', background: '#0B7B6F', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}> Mark Complete</button>
+                  <button
+                    onClick={markDone}
+                    disabled={completeLoading}
+                    style={{ width: '100%', background: '#0B7B6F', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '13px', fontWeight: '700', cursor: completeLoading ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans',sans-serif", opacity: completeLoading ? 0.7 : 1 }}
+                  >
+                    {completeLoading ? 'Completing...' : ' Mark Complete'}
+                  </button>
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', color: '#64748B', fontSize: '14px', padding: '20px 0' }}>No active consultation</div>
@@ -184,16 +232,16 @@ export default function AdminDashboard() {
               <div style={{ fontSize: '12px', color: '#64748B' }}>{waiting.length} waiting · {completed.length} done</div>
             </div>
             <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-              {patients.filter(p => p.status !== 'removed').length === 0 ? (
+              {apiPatients.length === 0 ? (
                 <div style={{ padding: '48px', textAlign: 'center', color: '#64748B' }}>No patients yet today</div>
-              ) : patients.filter(p => p.status !== 'removed').map(p => (
-                <div key={p.id} style={{ padding: '16px 24px', borderBottom: '1px solid #E2EEEC', display: 'flex', alignItems: 'center', gap: '16px', background: p.status === 'serving' ? '#E6F4F2' : '#fff' }}>
+              ) : apiPatients.map(p => (
+                <div key={p.tokenNumber} style={{ padding: '16px 24px', borderBottom: '1px solid #E2EEEC', display: 'flex', alignItems: 'center', gap: '16px', background: p.status === 'serving' ? '#E6F4F2' : '#fff' }}>
                   <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: p.status === 'serving' ? 'linear-gradient(135deg,#0B7B6F,#096358)' : p.status === 'done' ? '#E2EEEC' : '#E6F4F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', color: p.status === 'serving' ? '#fff' : '#0B7B6F', fontSize: '14px', flexShrink: 0 }}>
                     {String(p.tokenNumber).padStart(2,'0')}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '14px' }}>{p.name}</div>
-                    <div style={{ fontSize: '12px', color: '#64748B' }}>{p.reason} · {p.phone}</div>
+                    <div style={{ fontSize: '12px', color: '#64748B' }}>{p.phone}</div>
                   </div>
                   <span style={{
                     padding: '3px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '700',
@@ -213,7 +261,7 @@ export default function AdminDashboard() {
             <div style={{ padding: '20px 24px', borderTop: '1px solid #E2EEEC', background: '#F8FAFA', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px' }}>
               {[
                 { label: 'Avg Wait', val: waiting.length > 0 ? `${waiting.length * 10}m` : '0m' },
-                { label: 'Completion Rate', val: patients.length > 0 ? `${Math.round((completed.length / patients.filter(p => p.status !== 'removed').length) * 100)}%` : '0%' },
+                { label: 'Completion Rate', val: apiPatients.length > 0 ? `${Math.round((completed.length / apiPatients.length) * 100)}%` : '0%' },
                 { label: 'Revenue', val: `₹${revenue.toLocaleString()}` },
               ].map(s => (
                 <div key={s.label} style={{ textAlign: 'center' }}>

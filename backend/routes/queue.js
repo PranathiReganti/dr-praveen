@@ -7,6 +7,7 @@ import {
   getQueueStatus, 
   callNextPatient, 
   completeConsultation,
+  completeConsultationByTokenNumber,
   moveQueueForward
 } from '../controllers/queueController.js'
 import authMiddleware from '../middleware/authMiddleware.js'
@@ -23,6 +24,8 @@ router.post('/book', bookToken)
 router.get('/track/:phone', trackQueue)
 router.get('/status/:clinicId', getQueueStatus)
 router.patch('/call-next/:clinicId', authMiddleware, callNextPatient)
-router.patch('/complete/:patientId', authMiddleware, completeConsultation)
+router.patch('/complete/:tokenNumber', completeConsultationByTokenNumber)
+// Legacy body-based completion (kept for compatibility)
+router.patch('/complete-body', authMiddleware, completeConsultation)
 
 export default router
