@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CLINICS } from '../data/content'
 import { useAuth } from '../hooks/useAuth'
+import { apiRequest } from '../utils/api'
 
 const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
 
@@ -25,8 +26,7 @@ export default function AdminDashboard() {
 
     const fetchQueue = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/queue')
-        const json = await res.json()
+        const json = await apiRequest('/api/queue')
         if (!mounted) return
         setQueueData(json?.data ?? null)
       } catch {
@@ -57,9 +57,8 @@ export default function AdminDashboard() {
     if (!form.name || !form.phone || !form.reason) return
     setAdding(true)
     try {
-      await fetch('http://localhost:5000/api/queue/add', {
+      await apiRequest('/api/queue/add', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: form.name,
           phone: form.phone,
@@ -76,11 +75,7 @@ export default function AdminDashboard() {
   }
 
   async function callNext() {
-    await fetch('http://localhost:5000/api/queue/next', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    })
+    await apiRequest('/api/queue/next', { method: 'POST' })
   }
 
   async function markDone() {
@@ -88,11 +83,9 @@ export default function AdminDashboard() {
     if (completeLoading) return
     setCompleteLoading(true)
     try {
-      const res = await fetch(`http://localhost:5000/api/queue/complete/${serving.tokenNumber}`, {
+      const json = await apiRequest(`/api/queue/complete/${serving.tokenNumber}`, {
         method: 'PATCH'
       })
-      if (!res.ok) throw new Error('Failed to complete consultation')
-      const json = await res.json()
       setQueueData(json?.data ?? null)
     } catch (e) {
       console.error(e)

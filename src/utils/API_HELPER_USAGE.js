@@ -18,7 +18,7 @@
 // ✅ BEFORE - Manual fetch
 import { useState } from 'react'
 async function handleLogin(username, password) {
-  const response = await fetch('http://localhost:5000/api/auth/login', {
+  const response = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
@@ -174,10 +174,9 @@ async function syncData() {
  * 
  * How to update more components:
  * 1. Import: import { apiFetch } from '../utils/api'
- * 2. Remove: const API_BASE_URL = 'http://localhost:5000'
- * 3. Replace: fetch(`${API_BASE_URL}/api/...`)
+ * 2. Replace: fetch(`/api/...`)
  *    With: apiFetch('/api/...')
- * 4. Test: Verify requests include Authorization header in DevTools
+ * 3. Test: Verify requests include Authorization header in DevTools
  */
 
 /**

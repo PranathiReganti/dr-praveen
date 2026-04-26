@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DOCTOR } from '../data/content'
-import { apiFetch } from '../utils/api'
+import { apiRequest } from '../utils/api'
 
 export default function Login() {
   const [role, setRole]       = useState('admin')
@@ -28,23 +28,13 @@ export default function Login() {
       }
 
       // Send login request to backend
-      const response = await apiFetch('/api/auth/login', {
+      const data = await apiRequest('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({
           username: role,
           password: pin
         })
       })
-
-      const data = await response.json()
-
-      // Check if login was successful
-      if (!response.ok) {
-        setError(data.message || 'Invalid credentials. Please try again.')
-        setPin('')
-        setLoading(false)
-        return
-      }
 
       // Store token and role in localStorage
       if (data.token) {
@@ -61,7 +51,7 @@ export default function Login() {
       }
     } catch (err) {
       console.error('[LOGIN ERROR]', err)
-      setError('Network error. Please check your connection and try again.')
+      setError(err.message || 'Invalid credentials. Please try again.')
       setPin('')
     } finally {
       setLoading(false)

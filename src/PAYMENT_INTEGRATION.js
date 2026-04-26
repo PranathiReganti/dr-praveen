@@ -97,14 +97,12 @@ const result = await verifyPayment({orderId, paymentId, signature})
 
 // 1. Start Backend
 // npm run dev (in backend folder)
-// Server runs on http://localhost:5000
 
 // 2. Start Frontend
 // npm run dev (in project root)
-// Frontend runs on http://localhost:3001
 
 // 3. Test Payment Flow
-// Go to http://localhost:3001/queue
+// Go to /queue
 // Follow steps 1-3
 // Click "Proceed to Payment"
 // Click "Pay Now"
@@ -142,7 +140,6 @@ const result = await verifyPayment({orderId, paymentId, signature})
 
 // TODO: Integrate actual Razorpay SDK when ready
 // TODO: Add real Razorpay signature verification
-// TODO: Add payment retry logic
 // TODO: Add payment success/failure webhooks
 // TODO: Add transaction logging
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CLINICS, DOCTOR } from '../data/content'
 import { useAuth } from '../hooks/useAuth'
+import { apiRequest } from '../utils/api'
 
 export default function DoctorDashboard() {
   const nav = useNavigate()
@@ -21,8 +22,7 @@ export default function DoctorDashboard() {
 
     const fetchQueue = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/queue')
-        const json = await res.json()
+        const json = await apiRequest('/api/queue')
         if (!mounted) return
         setQueueData(json?.data ?? null)
       } catch {
@@ -48,11 +48,7 @@ export default function DoctorDashboard() {
     if (completeLoading) return
     setCompleteLoading(true)
     try {
-      const res = await fetch(`http://localhost:5000/api/queue/complete/${tokenNumber}`, {
-        method: 'PATCH'
-      })
-      if (!res.ok) throw new Error('Failed to complete consultation')
-      const json = await res.json()
+      const json = await apiRequest(`/api/queue/complete/${tokenNumber}`, { method: 'PATCH' })
       setQueueData(json?.data ?? null)
     } catch (e) {
       console.error(e)

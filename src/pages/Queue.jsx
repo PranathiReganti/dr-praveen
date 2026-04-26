@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { CLINICS, DOCTOR } from '../data/content'
-import { apiFetch } from '../utils/api'
+import { apiRequest } from '../utils/api'
 import { createPaymentOrder, verifyPayment, simulateRazorpayPayment } from '../utils/payment'
 
 const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
@@ -94,7 +94,7 @@ export default function Queue() {
     setLoading(true); setError('')
     try {
       // Call backend API to generate token
-      const response = await apiFetch('/api/queue/add', {
+      const result = await apiRequest('/api/queue/add', {
         method: 'POST',
         body: JSON.stringify({
           name: form.name,
@@ -104,10 +104,8 @@ export default function Queue() {
         })
       })
 
-      const result = await response.json()
-
-      if (!response.ok) {
-        setError(result.message || 'Failed to generate token. Please try again.')
+      if (!result) {
+        setError('Failed to generate token. Please try again.')
         setLoading(false)
         return
       }

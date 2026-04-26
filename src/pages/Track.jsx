@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async'
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { DOCTOR } from '../data/content'
-import { apiFetch } from '../utils/api'
+import { apiRequest } from '../utils/api'
 
 export default function Track() {
   const params = new URLSearchParams(window.location.search)
@@ -23,10 +23,9 @@ export default function Track() {
   async function fetchQueueStatus() {
     try {
       setQueueLoading(true)
-      const response = await apiFetch('/api/queue')
-      const result = await response.json()
+      const result = await apiRequest('/api/queue')
       
-      if (response.ok && result.data) {
+      if (result.data) {
         setQueueStatus(result.data)
       }
     } catch (err) {

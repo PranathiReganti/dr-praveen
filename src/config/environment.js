@@ -7,7 +7,7 @@ const ENV = import.meta.env.MODE || 'development'
 
 const config = {
   development: {
-    API_BASE_URL: 'http://localhost:5000',
+    API_BASE_URL: 'https://dr-praveen.onrender.com',
     API_TIMEOUT: 30000, // 30 seconds
   },
   production: {

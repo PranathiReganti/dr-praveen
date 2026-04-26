@@ -3,7 +3,7 @@
  * Handles Razorpay payment flow for token booking
  */
 
-import { apiFetch } from './api'
+import { apiRequest } from './api'
 
 /**
  * Create payment order
@@ -12,18 +12,10 @@ import { apiFetch } from './api'
  */
 export async function createPaymentOrder(amount = 500) {
   try {
-    const response = await apiFetch('/api/payment/create-order', {
+    return await apiRequest('/api/payment/create-order', {
       method: 'POST',
       body: JSON.stringify({ amount })
     })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to create order')
-    }
-
-    return data
   } catch (error) {
     console.error('[CREATE ORDER ERROR]', error)
     throw error
@@ -37,18 +29,10 @@ export async function createPaymentOrder(amount = 500) {
  */
 export async function verifyPayment(paymentDetails) {
   try {
-    const response = await apiFetch('/api/payment/verify', {
+    return await apiRequest('/api/payment/verify', {
       method: 'POST',
       body: JSON.stringify(paymentDetails)
     })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Payment verification failed')
-    }
-
-    return data
   } catch (error) {
     console.error('[VERIFY PAYMENT ERROR]', error)
     throw error
