@@ -215,3 +215,13 @@ body {
   }
 
 }
+/* 🔥 Hide hamburger on desktop */
+.menu-btn {
+  display: none !important;
+}
+
+/* ✅ Show only on mobile */
+@media (max-width: 900px) {
+  .menu-btn {
+    display: flex !important;  }
+}
