@@ -6,14 +6,12 @@ function Stat({ target, suffix, prefix, label }) {
   return (
     <div className="stat-item">
 
-      {/* NUMBER */}
       <div className="stat-number">
         {prefix && <span className="stat-prefix">{prefix}</span>}
         <span ref={ref}>0</span>
         {suffix}
       </div>
 
-      {/* LABEL */}
       <div className="stat-label">
         {label}
       </div>
@@ -41,16 +39,16 @@ export default function StatsCounter() {
 
       <style>{`
 
-        /* 🔥 SINGLE ROW FIX (MAIN) */
         .stats-inline {
           width: 100%;
           display: flex;
           align-items: center;
+          justify-content: center;
           gap: 28px;
 
-          flex-wrap: nowrap;         /* ❗ NEVER BREAK */
-          overflow-x: auto;          /* ❗ SCROLL INSTEAD */
-          white-space: nowrap;       /* ❗ PREVENT TEXT BREAK */
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          white-space: nowrap;
 
           scrollbar-width: none;
           padding: 10px 0;
@@ -60,13 +58,12 @@ export default function StatsCounter() {
           display: none;
         }
 
-        /* ITEM */
         .stat-item {
           position: relative;
-          flex: 0 0 auto;            /* ❗ prevent shrinking */
+          flex: 0 0 auto;
+          min-width: 90px;   /* 🔥 IMPORTANT */
         }
 
-        /* NUMBER */
         .stat-number {
           font-family: 'Cormorant Garamond', serif;
           font-size: 26px;
@@ -79,17 +76,14 @@ export default function StatsCounter() {
           color: #0B7B6F;
         }
 
-        /* LABEL */
         .stat-label {
           font-size: 10px;
           letter-spacing: 1px;
           text-transform: uppercase;
           color: #64748B;
-
-          white-space: nowrap;       /* ❗ CRITICAL */
+          white-space: nowrap;
         }
 
-        /* DIVIDER */
         .stat-item:not(:last-child)::after {
           content: "";
           position: absolute;
@@ -101,10 +95,12 @@ export default function StatsCounter() {
           background: #DDE7E5;
         }
 
-        /* MOBILE TUNE */
+        /* ✅ FINAL MOBILE FIX */
         @media (max-width: 900px) {
 
           .stats-inline {
+            justify-content: flex-start;
+            padding: 10px 10px;   /* 🔥 LEFT + RIGHT FIX */
             gap: 20px;
           }
 

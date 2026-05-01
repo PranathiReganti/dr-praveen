@@ -8,9 +8,11 @@ import {
   Navigation
 } from "lucide-react";
 
+import clinicImg from "../assets/images/clinic.jpg"; // ✅ FIXED
+
 export default function ClinicsCard() {
   return (
-    <section style={{ padding: ' 80px',marginTop: '-40px', background: '#F8FAFA' }}>
+    <section style={{ padding: '80px', marginTop: '-40px', background: '#F8FAFA' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
 
         {/* HEADER */}
@@ -52,14 +54,26 @@ export default function ClinicsCard() {
               style={{
                 borderRadius: '22px',
                 overflow: 'hidden',
-                border: '1px solid #E2EEEC'
+                border: '1px solid #E2EEEC',
+                background: '#fff'
               }}
             >
 
+              {/* 🔥 IMAGE ADDED (TOP) */}
+              <img
+                src={clinicImg}
+                alt="Clinic"
+                style={{
+                  width: '100%',
+                  height: '180px',
+                  objectFit: 'cover'
+                }}
+              />
+
               {/* TOP */}
-              <div style={{ background: c.color, padding: '30px' }}>
+              <div style={{ background: c.color, padding: '22px' }}>
                 <div style={{
-                  fontSize: '22px',
+                  fontSize: '20px',
                   fontWeight: '700',
                   color: '#fff'
                 }}>
@@ -68,14 +82,14 @@ export default function ClinicsCard() {
 
                 <div style={{
                   fontSize: '12px',
-                  color: 'rgba(255,255,255,0.65)'
+                  color: 'rgba(255,255,255,0.7)'
                 }}>
                   {c.spec}
                 </div>
               </div>
 
               {/* BODY */}
-              <div style={{ padding: '26px' }}>
+              <div style={{ padding: '24px' }}>
 
                 <Row icon={<MapPin size={18} />} text={c.address} />
                 <Row icon={<Clock size={18} />} text={c.timings.join(' · ')} />
@@ -91,15 +105,19 @@ export default function ClinicsCard() {
                     Book
                   </Link>
 
-                  <a href={c.maps} target="_blank" rel="noreferrer"
-                     style={{
-                       width: '48px',
-                       display: 'flex',
-                       alignItems: 'center',
-                       justifyContent: 'center',
-                       border: '1px solid #E2EEEC',
-                       borderRadius: '10px'
-                     }}>
+                  <a
+                    href={c.maps}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      width: '48px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '1px solid #E2EEEC',
+                      borderRadius: '10px'
+                    }}
+                  >
                     <Navigation size={18} />
                   </a>
                 </div>
@@ -111,7 +129,7 @@ export default function ClinicsCard() {
 
       </div>
 
-      {/* 🔥 RESPONSIVE ONLY */}
+      {/* RESPONSIVE */}
       <style>{`
         @media (max-width: 900px) {
           .clinic-grid {
@@ -124,7 +142,7 @@ export default function ClinicsCard() {
   )
 }
 
-/* SAME ROW — NOT CHANGED */
+/* SAME ROW */
 function Row({ icon, text }) {
   return (
     <div style={{

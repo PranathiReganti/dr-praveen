@@ -60,7 +60,7 @@ export default function Clinics() {
           }}>
 
             {CLINICS.map((c) => (
-              <div key={c.id} id={c.id} style={{
+              <div key={c.id} id={c.id} className="clinic-card" style={{
                 borderRadius: '24px',
                 overflow: 'hidden',
                 border: '1px solid #E2EEEC',
@@ -70,7 +70,7 @@ export default function Clinics() {
               }}>
 
                 {/* LEFT */}
-                <div style={{
+                <div className="clinic-left" style={{
                   background: c.color,
                   padding: '48px 40px',
                   display: 'flex',
@@ -79,7 +79,6 @@ export default function Clinics() {
                   position: 'relative',
                   overflow: 'hidden'
                 }}>
-
                   <div>
                     <div style={{
                       fontFamily: "'Cormorant Garamond',serif",
@@ -109,7 +108,6 @@ export default function Clinics() {
                       {c.spec}
                     </p>
 
-                    {/* ✅ FIXED chips */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                       {c.chips?.map(ch => (
                         <span key={ch} style={{
@@ -156,14 +154,11 @@ export default function Clinics() {
                 </div>
 
                 {/* RIGHT */}
-                <div style={{ background: '#fff', padding: '40px' }}>
+                <div className="clinic-right" style={{ background: '#fff', padding: '40px' }}>
                   {[
                     { key: 'address', label: 'Full Address', text: c.address },
                     { key: 'landmark', label: 'Landmark', text: c.landmark },
-
-                    // ✅ FIXED timings
                     { key: 'timings', label: 'Timings', text: Array.isArray(c.timings) ? c.timings.join(' · ') : '' },
-
                     { key: 'days', label: 'Working Days', text: c.days },
                     { key: 'phone', label: 'Phone', text: c.phone },
                   ].map(row => (
@@ -176,10 +171,10 @@ export default function Clinics() {
                       borderRadius: '12px',
                       border: '1px solid #E2EEEC'
                     }}>
-
                       <div style={{
                         width: '36px',
                         height: '36px',
+                        minWidth: '36px',
                         borderRadius: '10px',
                         background: '#E6F4F2',
                         display: 'flex',
@@ -196,20 +191,20 @@ export default function Clinics() {
                           fontWeight: '700',
                           color: '#0B7B6F',
                           textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
                           marginBottom: '4px'
                         }}>
                           {row.label}
                         </div>
-
                         <div style={{
                           fontSize: '13.5px',
                           color: '#0A1628',
-                          fontWeight: '500'
+                          fontWeight: '500',
+                          lineHeight: '1.5'
                         }}>
                           {row.text}
                         </div>
                       </div>
-
                     </div>
                   ))}
                 </div>
@@ -221,6 +216,102 @@ export default function Clinics() {
         </section>
 
       </div>
+
+      {/* ── MOBILE ONLY ── */}
+      <style>{`
+        @media (max-width: 768px) {
+
+          /* Stack card vertically */
+          .clinic-card {
+            grid-template-columns: 1fr !important;
+            border-radius: 20px !important;
+          }
+
+          /* ── LEFT PANEL: compact hero banner ── */
+          .clinic-left {
+            padding: 28px 20px 24px !important;
+            border-radius: 0 !important;
+          }
+
+          /* Big number watermark: smaller */
+          .clinic-left > div > div:first-child {
+            font-size: 48px !important;
+            margin-bottom: -12px !important;
+          }
+
+          /* Clinic name */
+          .clinic-left > div > h2 {
+            font-size: 22px !important;
+            margin-bottom: 4px !important;
+          }
+
+          /* Specialty */
+          .clinic-left > div > p {
+            font-size: 13px !important;
+            margin-bottom: 16px !important;
+          }
+
+          /* Chip tags: wrap tightly */
+          .clinic-left > div > div {
+            gap: 6px !important;
+          }
+
+          .clinic-left > div > div span {
+            font-size: 11px !important;
+            padding: 4px 10px !important;
+          }
+
+          /* Buttons row */
+          .clinic-left > div:last-child {
+            margin-top: 20px !important;
+            flex-direction: row !important;
+            gap: 8px !important;
+          }
+
+          .clinic-left > div:last-child a {
+            flex: 1 !important;
+            text-align: center !important;
+            padding: 10px 12px !important;
+            font-size: 12px !important;
+            border-radius: 10px !important;
+          }
+
+          /* ── RIGHT PANEL: info rows ── */
+          .clinic-right {
+            padding: 20px 16px !important;
+            background: #F8FAFA !important;
+          }
+
+          /* Each info row */
+          .clinic-right > div {
+            padding: 12px !important;
+            margin-bottom: 10px !important;
+            gap: 12px !important;
+            border-radius: 12px !important;
+            background: #fff !important;
+          }
+
+          /* Icon box */
+          .clinic-right > div > div:first-child {
+            width: 32px !important;
+            height: 32px !important;
+            min-width: 32px !important;
+            border-radius: 8px !important;
+          }
+
+          /* Label */
+          .clinic-right > div > div:last-child > div:first-child {
+            font-size: 9px !important;
+            margin-bottom: 2px !important;
+          }
+
+          /* Value text */
+          .clinic-right > div > div:last-child > div:last-child {
+            font-size: 13px !important;
+            line-height: 1.4 !important;
+          }
+        }
+      `}</style>
     </>
   )
 }

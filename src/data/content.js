@@ -27,7 +27,7 @@ export const DOCTOR = {
   phone: '08041675151',
   whatsapp: '919686039505',
   email: 'praveenendocrine@gmail.com',
-  photo: null,
+  photo: "/doctor.jpg",
   bio: `Dr. Praveen Ramachandra is a highly qualified consultant endocrinologist...`,
   shortBio: `Specialist in diabetes, thyroid, hormones and metabolic disorders.`,
 }
