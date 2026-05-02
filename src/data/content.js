@@ -25,10 +25,10 @@ export const DOCTOR = {
   rating: '4.7',
   reviews: '131',
   phone: '08041675151',
-  whatsapp: '919686039505',
+  whatsapp: '9686039505',
   email: 'praveenendocrine@gmail.com',
   photo: "/doctor.jpg",
-  bio: `Dr. Praveen Ramachandra is a highly qualified consultant endocrinologist...`,
+  bio: `Dr. Praveen Ramachandra is a highly qualified consultant endocrinologist with extensive experience in managing diabetes, thyroid disorders, hormonal imbalances, obesity, and PCOS. He is known for providing personalized, evidence-based care to ensure long-term patient well-being.`,
   shortBio: `Specialist in diabetes, thyroid, hormones and metabolic disorders.`,
 }
 

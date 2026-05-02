@@ -32,7 +32,6 @@ export default function Contact() {
           <div className="section-tag" style={{ justifyContent: 'center', color: '#0FA898' }}>
             GET IN TOUCH
           </div>
-
           <h1 style={{
             fontFamily: "'Cormorant Garamond',serif",
             fontSize: 'clamp(36px,5vw,60px)',
@@ -45,7 +44,7 @@ export default function Contact() {
 
         {/* MAIN */}
         <section style={{ padding: '80px 5%', background: '#fff' }}>
-          <div style={{
+          <div className="contact-grid" style={{
             maxWidth: '1100px',
             margin: '0 auto',
             display: 'grid',
@@ -79,29 +78,34 @@ export default function Contact() {
                     {c.name}
                   </div>
 
-                  {[c.address, c.landmark, c.timings.join(' · '), c.days].map((text, i) => (
-                    <div key={i} style={{
-                      display: 'flex',
-                      gap: '10px',
-                      marginBottom: '10px',
-                      fontSize: '13px',
-                      color: '#64748B'
-                    }}>
-                      <span>{text}</span>
-                    </div>
-                  ))}
+                  {/* Address row */}
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '14px' }}></span>
+                    <span style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.5' }}>{c.address}</span>
+                  </div>
+
+                  {/* Landmark */}
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '14px' }}></span>
+                    <span style={{ fontSize: '13px', color: '#64748B' }}>{c.landmark}</span>
+                  </div>
+
+                  {/* Timings */}
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '14px' }}></span>
+                    <span style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.5' }}>{c.timings.join(' · ')}</span>
+                  </div>
+
+                  {/* Days */}
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '14px' }}></span>
+                    <span style={{ fontSize: '13px', color: '#64748B' }}>{c.days}</span>
+                  </div>
                 </div>
               ))}
 
               {/* CONTACT BUTTONS */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-                marginTop: '24px'
-              }}>
-
-                {/* CALL */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '24px' }}>
                 <a
                   href={`tel:${DOCTOR.phone}`}
                   style={{
@@ -117,10 +121,9 @@ export default function Contact() {
                     fontSize: '14px'
                   }}
                 >
-                  Call {DOCTOR.phone}
+                   Call {DOCTOR.phone}
                 </a>
 
-                {/* ✅ FIXED WHATSAPP BUTTON */}
                 <a
                   href={`https://wa.me/${DOCTOR.whatsapp}?text=${WHATSAPP_MSG}`}
                   target="_blank"
@@ -138,19 +141,12 @@ export default function Contact() {
                     fontSize: '14px',
                     transition: '0.3s'
                   }}
-                  onMouseEnter={e =>
-                    e.currentTarget.style.background =
-                      'linear-gradient(135deg, #09665d, #0c8f82)'
-                  }
-                  onMouseLeave={e =>
-                    e.currentTarget.style.background =
-                      'linear-gradient(135deg, #0B7B6F, #0FA898)'
-                  }
+                  onMouseEnter={e => e.currentTarget.style.background = 'linear-gradient(135deg, #09665d, #0c8f82)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'linear-gradient(135deg, #0B7B6F, #0FA898)'}
                 >
-                  WhatsApp Us
+                   WhatsApp Us
                 </a>
 
-                {/* EMAIL */}
                 <a
                   href={`mailto:${DOCTOR.email}`}
                   style={{
@@ -167,9 +163,8 @@ export default function Contact() {
                     border: '1px solid #E2EEEC'
                   }}
                 >
-                  {DOCTOR.email}
+                   {DOCTOR.email}
                 </a>
-
               </div>
             </div>
 
@@ -196,18 +191,13 @@ export default function Contact() {
                   }}>
                     Message Sent!
                   </div>
-
-                  <p style={{ color: '#64748B' }}>
-                    Your message has been sent via WhatsApp.
-                  </p>
+                  <p style={{ color: '#64748B' }}>Your message has been sent via WhatsApp.</p>
                 </div>
               ) : (
                 <form onSubmit={submit}>
-
-                  {/* INPUTS */}
                   {[
-                    { label: 'Full Name', key: 'name' },
-                    { label: 'Phone Number', key: 'phone' }
+                    { label: 'Full Name', key: 'name', type: 'text' },
+                    { label: 'Phone Number', key: 'phone', type: 'tel' }
                   ].map(f => (
                     <div key={f.key} style={{ marginBottom: '20px' }}>
                       <label style={{
@@ -215,42 +205,65 @@ export default function Contact() {
                         fontSize: '12px',
                         fontWeight: '700',
                         color: '#0B7B6F',
-                        marginBottom: '8px'
+                        marginBottom: '8px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
                       }}>
                         {f.label}
                       </label>
-
                       <input
+                        type={f.type}
                         value={form[f.key]}
                         onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                         required
                         style={{
                           width: '100%',
-                          padding: '13px',
+                          padding: '13px 16px',
                           border: '1.5px solid #E2EEEC',
-                          borderRadius: '10px'
+                          borderRadius: '10px',
+                          fontSize: '14px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                          background: '#F8FAFA',
+                          color: '#0A1628'
                         }}
                       />
                     </div>
                   ))}
 
-                  {/* MESSAGE */}
-                  <textarea
-                    placeholder="Your message..."
-                    value={form.message}
-                    onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
-                    rows={5}
-                    required
-                    style={{
-                      width: '100%',
-                      padding: '13px',
-                      border: '1.5px solid #E2EEEC',
-                      borderRadius: '10px',
-                      marginBottom: '24px'
-                    }}
-                  />
+                  <div style={{ marginBottom: '24px' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#0B7B6F',
+                      marginBottom: '8px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Your Message
+                    </label>
+                    <textarea
+                      placeholder="How can we help you?"
+                      value={form.message}
+                      onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
+                      rows={5}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '13px 16px',
+                        border: '1.5px solid #E2EEEC',
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        background: '#F8FAFA',
+                        color: '#0A1628',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
 
-                  {/* SUBMIT */}
                   <button
                     type="submit"
                     style={{
@@ -261,12 +274,12 @@ export default function Contact() {
                       color: '#fff',
                       border: 'none',
                       fontWeight: '600',
-                      fontSize: '15px'
+                      fontSize: '15px',
+                      cursor: 'pointer'
                     }}
                   >
-                    Send via WhatsApp
+                     Send via WhatsApp
                   </button>
-
                 </form>
               )}
             </div>
@@ -274,6 +287,78 @@ export default function Contact() {
           </div>
         </section>
       </div>
+
+      {/* ── MOBILE ONLY ── */}
+      <style>{`
+        @media (max-width: 768px) {
+
+          /* Stack columns */
+          .contact-grid {
+            grid-template-columns: 1fr !important;
+            gap: 0 !important;
+            padding: 0 !important;
+          }
+
+          /* Reduce section padding on mobile */
+          .contact-grid > div {
+            padding-bottom: 8px !important;
+          }
+
+          /* Headings */
+          .contact-grid .section-h2 {
+            font-size: 22px !important;
+            margin-bottom: 20px !important;
+          }
+
+          /* Clinic cards: tighter */
+          .contact-grid > div:first-child > div[style*="background: #F8FAFA"] {
+            padding: 16px !important;
+            margin-bottom: 12px !important;
+            border-radius: 14px !important;
+          }
+
+          /* Clinic name */
+          .contact-grid > div:first-child > div[style*="background: #F8FAFA"] > div:first-child {
+            font-size: 16px !important;
+            margin-bottom: 12px !important;
+            padding-bottom: 10px !important;
+          }
+
+          /* Contact buttons row: side by side for call + whatsapp */
+          .contact-grid > div:first-child > div[style*="flexDirection: column"] {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+          }
+
+          /* Email button: full width */
+          .contact-grid > div:first-child > div[style*="flexDirection: column"] > a:last-child {
+            grid-column: 1 / -1 !important;
+          }
+
+          .contact-grid > div:first-child > div[style*="flexDirection: column"] > a {
+            font-size: 13px !important;
+            padding: 12px 10px !important;
+            justify-content: center !important;
+            text-align: center !important;
+          }
+
+          /* Divider between left and right on mobile */
+          .contact-grid > div:last-child {
+            padding-top: 32px !important;
+            border-top: 1px solid #E2EEEC !important;
+            margin-top: 24px !important;
+          }
+
+          /* Form inputs full width */
+          .contact-grid input,
+          .contact-grid textarea {
+            font-size: 16px !important; /* prevents iOS zoom */
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+        }
+      `}</style>
     </>
   )
 }

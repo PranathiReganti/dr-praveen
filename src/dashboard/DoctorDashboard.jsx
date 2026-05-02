@@ -52,7 +52,7 @@ export default function DoctorDashboard() {
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <a href="/" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', textDecoration: 'none' }}>← Website</a>
-          <button onClick={logout} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: "'DM Sans',sans-serif" }}>🔒 Logout</button>
+          <button onClick={logout} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: "'DM Sans',sans-serif" }}> Logout</button>
         </div>
       </div>
 
@@ -68,7 +68,7 @@ export default function DoctorDashboard() {
               color: clinic === c.id ? '#fff' : '#64748B',
               border: `2px solid ${clinic === c.id ? '#0B7B6F' : '#E2EEEC'}`,
               transition: 'all 0.2s',
-            }}>{c.id === 'diaplus' ? '🏥 Diaplus' : '🏥 Thyroplus'}</button>
+            }}>{c.id === 'diaplus' ? ' Diaplus' : ' Thyroplus'}</button>
           ))}
         </div>
 
@@ -113,7 +113,7 @@ export default function DoctorDashboard() {
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '32px 0', color: '#94A3B8' }}>
-              <div style={{ fontSize: '40px', marginBottom: '12px' }}>👨‍⚕️</div>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}></div>
               <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '6px' }}>No active consultation</div>
               <div style={{ fontSize: '13px' }}>Use "Call Next" from Admin panel to start</div>
             </div>
@@ -142,7 +142,7 @@ export default function DoctorDashboard() {
 
         {/* Summary */}
         <div style={{ background: 'linear-gradient(135deg,#0A1628,#0F2040)', borderRadius: '20px', padding: '28px' }}>
-          <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff', marginBottom: '20px' }}>📊 My Summary Today</div>
+          <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff', marginBottom: '20px' }}> My Summary Today</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '12px' }}>
             {[
               ['Total Patients',      patients.filter(p => p.status !== 'removed').length, '#fff'],

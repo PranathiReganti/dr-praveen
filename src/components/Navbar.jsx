@@ -25,24 +25,20 @@ export default function Navbar() {
 
   return (
     <>
-      <nav
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1000,
-          height: '72px',
-          padding: '0 5%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: scrolled ? 'rgba(255,255,255,0.97)' : 'transparent',
-          backdropFilter: scrolled ? 'blur(20px)' : 'none',
-          boxShadow: scrolled ? '0 1px 20px rgba(0,0,0,0.06)' : 'none',
-          borderBottom: scrolled ? '1px solid #E2EEEC' : 'none',
-        }}
-      >
+      <nav style={{
+        position: 'fixed',
+        top: 0, left: 0, right: 0,
+        zIndex: 1000,
+        height: '72px',
+        padding: '0 5%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        background: scrolled ? 'rgba(255,255,255,0.97)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(20px)' : 'none',
+        boxShadow: scrolled ? '0 1px 20px rgba(0,0,0,0.06)' : 'none',
+        borderBottom: scrolled ? '1px solid #E2EEEC' : 'none',
+      }}>
 
         {/* BRAND */}
         <Link to="/" style={{
@@ -50,22 +46,14 @@ export default function Navbar() {
           alignItems: 'center',
           gap: '10px',
           textDecoration: 'none',
+          minWidth: 0,          /* prevents flex overflow */
+          overflow: 'hidden',
         }}>
+          <div className="nav-logo">PR</div>
 
-          {/* LOGO */}
-          <div className="nav-logo">
-            PR
-          </div>
-
-          {/* TEXT */}
-          <div className="nav-text">
-            <div className="name">
-              Dr. Praveen Ramachandra
-            </div>
-
-            <div className="sub">
-              ENDOCRINOLOGY SPECIALIST
-            </div>
+          <div className="nav-text" style={{ minWidth: 0 }}>
+            <div className="nav-name">Dr. Praveen Ramachandra</div>
+            <div className="nav-sub">ENDOCRINOLOGY SPECIALIST</div>
           </div>
         </Link>
 
@@ -73,10 +61,7 @@ export default function Navbar() {
         <ul className="nav-links">
           {links.map(l => (
             <li key={l.to}>
-              <Link
-                to={l.to}
-                className={pathname === l.to ? 'active' : ''}
-              >
+              <Link to={l.to} className={pathname === l.to ? 'active' : ''}>
                 {l.label}
               </Link>
             </li>
@@ -84,13 +69,10 @@ export default function Navbar() {
         </ul>
 
         {/* HAMBURGER */}
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="menu-btn"
-        >
-          <span/>
-          <span/>
-          <span/>
+        <button onClick={() => setMenuOpen(!menuOpen)} className="menu-btn" aria-label="Menu">
+          <span style={{ transform: menuOpen ? 'rotate(45deg) translate(4px,4px)' : 'none', transition: '0.2s' }}/>
+          <span style={{ opacity: menuOpen ? 0 : 1, transition: '0.2s' }}/>
+          <span style={{ transform: menuOpen ? 'rotate(-45deg) translate(4px,-4px)' : 'none', transition: '0.2s' }}/>
         </button>
 
       </nav>
@@ -99,20 +81,67 @@ export default function Navbar() {
       {menuOpen && (
         <div className="mobile-menu">
 
-          {/* HEADER */}
+          {/* HEADER ROW */}
           <div className="mobile-header">
-            <div className="logo">PR</div>
-            <div>
-              <div className="name">Dr. Praveen</div>
-              <div className="sub">Endocrinology Specialist</div>
+            <div className="mobile-logo">PR</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: '#0A1628', lineHeight: '1.2' }}>
+                Dr. Praveen Ramachandra
+              </div>
+              <div style={{ fontSize: '10px', color: '#0B7B6F', letterSpacing: '1.2px', marginTop: '2px' }}>
+                ENDOCRINOLOGY SPECIALIST
+              </div>
             </div>
+
+            {/* Close button */}
+            <button
+              onClick={() => setMenuOpen(false)}
+              style={{
+                marginLeft: 'auto', background: 'none', border: 'none',
+                fontSize: '22px', color: '#64748B', cursor: 'pointer', lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
           </div>
+
+          {/* DIVIDER */}
+          <div style={{ height: '1px', background: '#E2EEEC', marginBottom: '28px' }} />
 
           {/* LINKS */}
           <div className="mobile-links">
             {links.map(l => (
-              <Link key={l.to} to={l.to}>{l.label}</Link>
+              <Link
+                key={l.to}
+                to={l.to}
+                style={{
+                  color: pathname === l.to ? '#0B7B6F' : '#0A1628',
+                  background: pathname === l.to ? '#E6F4F2' : 'transparent',
+                  borderRadius: '10px',
+                  padding: '12px 16px',
+                  fontWeight: pathname === l.to ? '700' : '500',
+                }}
+              >
+                {l.label}
+              </Link>
             ))}
+          </div>
+
+          {/* BOTTOM CTA */}
+          <div style={{ marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid #E2EEEC' }}>
+            <Link
+              to="/queue"
+              onClick={() => setMenuOpen(false)}
+              style={{
+                display: 'block', textAlign: 'center',
+                background: 'linear-gradient(135deg,#0B7B6F,#096358)',
+                color: '#fff', borderRadius: '12px',
+                padding: '14px', fontWeight: '700',
+                fontSize: '15px', textDecoration: 'none',
+              }}
+            >
+              Book Appointment
+            </Link>
           </div>
 
         </div>
@@ -120,123 +149,147 @@ export default function Navbar() {
 
       <style>{`
 
-        /* LOGO */
         .nav-logo {
-          width: 42px;
-          height: 42px;
+          width: 40px;
+          height: 40px;
+          min-width: 40px;
           border-radius: 50%;
           background: #0B7B6F;
           color: white;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-weight: 600;
+          font-weight: 700;
+          font-size: 14px;
         }
 
-        .nav-text .name {
+        .nav-name {
           font-size: 15px;
-          font-weight: 600;
+          font-weight: 700;
           color: #0A1628;
           line-height: 1.2;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        .nav-text .sub {
+        .nav-sub {
           font-size: 10px;
           color: #0B7B6F;
-          letter-spacing: 1.5px;
+          letter-spacing: 1.4px;
+          white-space: nowrap;
         }
 
         /* DESKTOP LINKS */
         .nav-links {
           display: flex;
-          gap: 6px;
+          gap: 4px;
           list-style: none;
           margin: 0;
           padding: 0;
+          flex-shrink: 0;
         }
 
         .nav-links a {
           color: #64748B;
           font-size: 13px;
-          padding: 7px 14px;
+          padding: 7px 13px;
           border-radius: 8px;
           text-decoration: none;
+          white-space: nowrap;
+          font-family: 'DM Sans', sans-serif;
         }
 
-        .nav-links a.active {
+        .nav-links a.active,
+        .nav-links a:hover {
           color: #0B7B6F;
           background: #E6F4F2;
         }
 
-        /* MENU BUTTON */
+        /* HAMBURGER */
         .menu-btn {
           background: none;
           border: none;
-          display: flex;
+          display: none;
           flex-direction: column;
-          gap: 4px;
+          gap: 5px;
+          cursor: pointer;
+          padding: 4px;
+          flex-shrink: 0;
         }
 
         .menu-btn span {
-          width: 20px;
+          display: block;
+          width: 22px;
           height: 2px;
           background: #0A1628;
+          border-radius: 2px;
         }
 
-        /* MOBILE MENU */
+        /* MOBILE MENU OVERLAY */
         .mobile-menu {
           position: fixed;
           inset: 0;
           background: white;
-          z-index: 999;
-          padding: 24px;
+          z-index: 1001;
+          padding: 20px 24px 28px;
           display: flex;
           flex-direction: column;
+          overflow-y: auto;
         }
 
         .mobile-header {
           display: flex;
           align-items: center;
           gap: 12px;
-          margin-bottom: 40px;
+          margin-bottom: 20px;
         }
 
-        .mobile-header .logo {
+        .mobile-logo {
           width: 40px;
           height: 40px;
+          min-width: 40px;
           border-radius: 50%;
           background: #0B7B6F;
           color: white;
           display: flex;
           align-items: center;
           justify-content: center;
+          font-weight: 700;
+          font-size: 14px;
         }
 
         .mobile-links {
           display: flex;
           flex-direction: column;
-          gap: 24px;
-          font-size: 18px;
+          gap: 4px;
+          font-size: 17px;
+          flex: 1;
         }
 
         .mobile-links a {
           text-decoration: none;
-          color: #0A1628;
+          display: block;
         }
 
-        /* MOBILE FIX */
+        /* MOBILE BREAKPOINT */
         @media (max-width: 900px) {
-          .nav-links {
-            display: none;
-          }
+          .nav-links { display: none !important; }
+          .menu-btn  { display: flex !important; }
 
-          .nav-text .name {
+          .nav-name {
             font-size: 13px;
+            max-width: 180px;
           }
 
-          .nav-text .sub {
+          .nav-sub {
             font-size: 9px;
+            letter-spacing: 1px;
           }
+        }
+
+        @media (min-width: 901px) {
+          .menu-btn { display: none !important; }
         }
 
       `}</style>
