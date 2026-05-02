@@ -23,6 +23,8 @@ import Login from './dashboard/Login'
 import AdminDashboard from './dashboard/AdminDashboard'
 import DoctorDashboard from './dashboard/DoctorDashboard'
 
+import { logConnectionDiagnostics } from './utils/connectionChecker'
+
 function CustomCursor() {
   useEffect(() => {
     const cur = document.getElementById('cursor')
@@ -84,6 +86,16 @@ function Layout({ children }) {
 }
 
 export default function App() {
+  // Check backend connection on app load
+  useEffect(() => {
+    if (import.meta.env.MODE === 'development') {
+      console.log('[APP INIT] Checking backend connection...')
+      logConnectionDiagnostics().catch(err => {
+        console.error('[APP INIT] Connection check failed:', err)
+      })
+    }
+  }, [])
+
   return (
     <BrowserRouter>
       <LoadingScreen />

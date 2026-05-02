@@ -1,89 +1,100 @@
 import { useState, useEffect } from 'react'
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore'
-import { db } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
 import { CLINICS } from '../data/content'
+import { useAuth } from '../hooks/useAuth'
+import { apiRequest } from '../utils/api'
 
 const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
-  const [patients, setPatients] = useState([])
-  const [clinicId, setClinicId] = useState('diaplus')
-  const [showAdd, setShowAdd]   = useState(false)
-  const [form, setForm]         = useState({ name: '', phone: '', reason: '' })
-  const [adding, setAdding]     = useState(false)
+  const { logout } = useAuth('admin')
 
+  const [clinicId, setClinicId]               = useState('diaplus')
+  const [showAdd, setShowAdd]                 = useState(false)
+  const [form, setForm]                       = useState({ name: '', phone: '', reason: '' })
+  const [adding, setAdding]                   = useState(false)
+  const [queueData, setQueueData]             = useState(null)
+  const [queueLoading, setQueueLoading]       = useState(true)
+  const [completeLoading, setCompleteLoading] = useState(false)
+
+  // Poll queue every 4 seconds
   useEffect(() => {
-    if (localStorage.getItem('drp_role') !== 'admin') navigate('/login')
+    let mounted = true
+    let intervalId = null
+
+    const fetchQueue = async () => {
+      try {
+        const json = await apiRequest('/api/queue')
+        if (!mounted) return
+        setQueueData(json?.data ?? null)
+      } catch {
+        if (!mounted) return
+        setQueueData(null)
+      } finally {
+        if (!mounted) return
+        setQueueLoading(false)
+      }
+    }
+
+    fetchQueue()
+    intervalId = setInterval(fetchQueue, 4000)
+    return () => { mounted = false; if (intervalId) clearInterval(intervalId) }
   }, [])
 
-  useEffect(() => {
-    const today = new Date().toDateString()
-    const q = query(collection(db, 'patients'), where('clinicId', '==', clinicId), where('date', '==', today))
-    return onSnapshot(q, snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      list.sort((a, b) => a.tokenNumber - b.tokenNumber)
-      setPatients(list)
-    })
-  }, [clinicId])
-
-  const waiting   = patients.filter(p => p.status === 'waiting')
-  const serving   = patients.find(p => p.status === 'serving')
-  const completed = patients.filter(p => p.status === 'done')
-  const revenue   = completed.length * 500
+  const apiPatients = Array.isArray(queueData?.patients) ? queueData.patients : []
+  const waiting     = apiPatients.filter(p => p.status === 'waiting')
+  const serving     = apiPatients.find(p => p.status === 'serving')
+  const completed   = apiPatients.filter(p => p.status === 'done')
+  const revenue     = completed.length * 500
 
   async function addPatient() {
     if (!form.name || !form.phone || !form.reason) return
     setAdding(true)
-    const today = new Date().toDateString()
-    const tokenNum = patients.length + 1
-    await addDoc(collection(db, 'patients'), {
-      ...form, clinicId, doctor: 'Dr. Praveen Ramachandra',
-      tokenNumber: tokenNum, status: 'waiting',
-      date: today, createdAt: Timestamp.now(),
-      payment: false, consultationFee: 500,
-    })
-    setForm({ name: '', phone: '', reason: '' })
-    setShowAdd(false)
-    setAdding(false)
+    try {
+      await apiRequest('/api/queue/add', {
+        method: 'POST',
+        body: JSON.stringify({ name: form.name, phone: form.phone, reason: form.reason, clinic: clinicId })
+      })
+    } finally {
+      setForm({ name: '', phone: '', reason: '' })
+      setShowAdd(false)
+      setAdding(false)
+    }
   }
 
   async function callNext() {
-    if (serving) await updateDoc(doc(db, 'patients', serving.id), { status: 'done' })
-    if (waiting.length > 0) await updateDoc(doc(db, 'patients', waiting[0].id), { status: 'serving', servedAt: Timestamp.now() })
+    await apiRequest('/api/queue/next', { method: 'POST' })
   }
 
   async function markDone() {
-    if (serving) await updateDoc(doc(db, 'patients', serving.id), { status: 'done', doneAt: Timestamp.now() })
+    if (!serving?.tokenNumber || completeLoading) return
+    setCompleteLoading(true)
+    try {
+      const json = await apiRequest(`/api/queue/complete/${serving.tokenNumber}`, { method: 'PATCH' })
+      setQueueData(json?.data ?? null)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCompleteLoading(false)
+    }
   }
 
-  async function removePatient(id) {
-    await updateDoc(doc(db, 'patients', id), { status: 'removed' })
+  async function removePatient(tokenNumber) {
+    // Not yet supported by backend — no-op
   }
-
-  function logout() { localStorage.removeItem('drp_role'); navigate('/login') }
 
   const inputStyle = {
-    width: '100%',
-    padding: '11px 14px',
-    border: '1.5px solid #E2EEEC',
-    borderRadius: '9px',
-    fontSize: '14px',
-    fontFamily: "'DM Sans',sans-serif",
-    outline: 'none',
-    boxSizing: 'border-box',
-    background: '#F8FAFA',
+    width: '100%', padding: '11px 14px',
+    border: '1.5px solid #E2EEEC', borderRadius: '9px',
+    fontSize: '14px', fontFamily: "'DM Sans',sans-serif",
+    outline: 'none', boxSizing: 'border-box', background: '#F8FAFA',
   }
 
   const labelStyle = {
-    fontSize: '11px',
-    fontWeight: '700',
-    color: '#0B7B6F',
-    textTransform: 'uppercase',
-    letterSpacing: '0.8px',
-    display: 'block',
-    marginBottom: '8px',
+    fontSize: '11px', fontWeight: '700', color: '#0B7B6F',
+    textTransform: 'uppercase', letterSpacing: '0.8px',
+    display: 'block', marginBottom: '8px',
   }
 
   return (
@@ -91,16 +102,10 @@ export default function AdminDashboard() {
 
       {/* ── HEADER ── */}
       <div style={{
-        background: '#0A1628',
-        padding: '0 20px',
-        height: '60px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        background: '#0A1628', padding: '0 20px', height: '60px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
+        position: 'sticky', top: 0, zIndex: 100,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
@@ -139,23 +144,20 @@ export default function AdminDashboard() {
 
       <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
 
-        {/* ── STATS GRID ── */}
+        {/* ── STATS ── */}
         <div className="admin-stats" style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4,1fr)',
-          gap: '12px',
-          marginBottom: '20px',
+          display: 'grid', gridTemplateColumns: 'repeat(4,1fr)',
+          gap: '12px', marginBottom: '20px',
         }}>
           {[
-            { label: 'Total Patients', val: patients.filter(p => p.status !== 'removed').length, color: '#0A1628' },
-            { label: 'In Queue',       val: waiting.length,    color: '#F59E0B' },
-            { label: 'Completed',      val: completed.length,  color: '#0B7B6F' },
-            { label: 'Revenue',        val: `₹${revenue.toLocaleString()}`, color: '#0B7B6F' },
+            { label: 'Currently Serving', val: queueLoading ? '...' : (queueData?.currentToken ?? 0), color: '#0A1628' },
+            { label: 'Patients Waiting',  val: queueLoading ? '...' : (queueData?.waiting ?? waiting.length), color: '#F59E0B' },
+            { label: 'Completed Today',   val: completed.length, color: '#0B7B6F' },
+            { label: 'Revenue Today',     val: `₹${revenue.toLocaleString()}`, color: '#0B7B6F' },
           ].map(s => (
             <div key={s.label} style={{
-              background: '#fff', borderRadius: '12px',
-              padding: '16px 14px', border: '1px solid #E2EEEC',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              background: '#fff', borderRadius: '12px', padding: '16px 14px',
+              border: '1px solid #E2EEEC', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
             }}>
               <div style={{ fontSize: '10px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '6px' }}>{s.label}</div>
               <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '30px', fontWeight: '700', color: s.color, lineHeight: '1' }}>{s.val}</div>
@@ -166,7 +168,7 @@ export default function AdminDashboard() {
         {/* ── MAIN GRID ── */}
         <div className="admin-main" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
 
-          {/* LEFT — Controls */}
+          {/* LEFT */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
             {/* Now Consulting */}
@@ -176,21 +178,24 @@ export default function AdminDashboard() {
                 <div>
                   <div style={{
                     background: 'linear-gradient(135deg,#E6F4F2,#EFF7F6)',
-                    borderRadius: '10px', padding: '14px',
-                    marginBottom: '14px', borderLeft: '4px solid #0B7B6F',
+                    borderRadius: '10px', padding: '14px', marginBottom: '14px',
+                    borderLeft: '4px solid #0B7B6F',
                   }}>
                     <div style={{ fontSize: '22px', fontWeight: '800', color: '#0B7B6F', fontFamily: "'Cormorant Garamond',serif" }}>
                       #{String(serving.tokenNumber).padStart(2, '0')}
                     </div>
                     <div style={{ fontWeight: '700', color: '#0A1628', marginTop: '4px', fontSize: '14px' }}>{serving.name}</div>
-                    <div style={{ fontSize: '12px', color: '#64748B' }}>{serving.reason}</div>
+                    <div style={{ fontSize: '12px', color: '#64748B' }}>{serving.reason ?? serving.phone}</div>
                   </div>
-                  <button onClick={markDone} style={{
+                  <button onClick={markDone} disabled={completeLoading} style={{
                     width: '100%', background: '#0B7B6F', color: '#fff',
                     border: 'none', borderRadius: '9px', padding: '11px',
-                    fontSize: '13px', fontWeight: '700', cursor: 'pointer',
-                    fontFamily: "'DM Sans',sans-serif",
-                  }}>Mark Complete</button>
+                    fontSize: '13px', fontWeight: '700',
+                    cursor: completeLoading ? 'not-allowed' : 'pointer',
+                    fontFamily: "'DM Sans',sans-serif", opacity: completeLoading ? 0.7 : 1,
+                  }}>
+                    {completeLoading ? 'Completing...' : 'Mark Complete'}
+                  </button>
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', color: '#94A3B8', fontSize: '13px', padding: '16px 0' }}>No active consultation</div>
@@ -220,7 +225,6 @@ export default function AdminDashboard() {
               {showAdd ? 'Cancel' : '+ Add Patient Manually'}
             </button>
 
-            {/* Add Patient Form */}
             {showAdd && (
               <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', border: '1px solid #E2EEEC' }}>
                 {[
@@ -242,8 +246,7 @@ export default function AdminDashboard() {
                 ))}
                 <div style={{ marginBottom: '14px' }}>
                   <label style={labelStyle}>Reason</label>
-                  <select value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))}
-                    style={{ ...inputStyle }}>
+                  <select value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} style={{ ...inputStyle }}>
                     <option value="">Select reason...</option>
                     {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
@@ -268,10 +271,12 @@ export default function AdminDashboard() {
             </div>
 
             <div style={{ maxHeight: '460px', overflowY: 'auto' }}>
-              {patients.filter(p => p.status !== 'removed').length === 0 ? (
+              {queueLoading ? (
+                <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>Loading...</div>
+              ) : apiPatients.length === 0 ? (
                 <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>No patients yet today</div>
-              ) : patients.filter(p => p.status !== 'removed').map(p => (
-                <div key={p.id} style={{
+              ) : apiPatients.map(p => (
+                <div key={p.tokenNumber} style={{
                   padding: '14px 20px', borderBottom: '1px solid #F0F4F4',
                   display: 'flex', alignItems: 'center', gap: '14px',
                   background: p.status === 'serving' ? '#E6F4F2' : '#fff',
@@ -286,7 +291,9 @@ export default function AdminDashboard() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                    <div style={{ fontSize: '11px', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.reason} · {p.phone}</div>
+                    <div style={{ fontSize: '11px', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {p.reason ?? ''}{p.phone ? ` · ${p.phone}` : ''}
+                    </div>
                   </div>
                   <span style={{
                     padding: '3px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: '700', flexShrink: 0,
@@ -296,7 +303,7 @@ export default function AdminDashboard() {
                     {p.status === 'serving' ? 'Serving' : p.status === 'done' ? 'Done' : 'Waiting'}
                   </span>
                   {p.status === 'waiting' && (
-                    <button onClick={() => removePatient(p.id)} style={{
+                    <button onClick={() => removePatient(p.tokenNumber)} style={{
                       background: 'none', border: '1px solid #E2EEEC', borderRadius: '6px',
                       color: '#94A3B8', cursor: 'pointer', fontSize: '11px',
                       padding: '3px 8px', fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
@@ -306,11 +313,11 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {/* Summary bar */}
+            {/* Summary */}
             <div style={{ padding: '16px 20px', borderTop: '1px solid #E2EEEC', background: '#F8FAFA', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
               {[
                 { label: 'Avg Wait', val: waiting.length > 0 ? `${waiting.length * 10}m` : '0m' },
-                { label: 'Completion Rate', val: patients.filter(p => p.status !== 'removed').length > 0 ? `${Math.round((completed.length / patients.filter(p => p.status !== 'removed').length) * 100)}%` : '0%' },
+                { label: 'Completion Rate', val: apiPatients.length > 0 ? `${Math.round((completed.length / apiPatients.length) * 100)}%` : '0%' },
                 { label: 'Revenue', val: `₹${revenue.toLocaleString()}` },
               ].map(s => (
                 <div key={s.label} style={{ textAlign: 'center' }}>
@@ -324,62 +331,14 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* ── MOBILE ONLY ── */}
       <style>{`
         @media (max-width: 768px) {
-
-          /* Stats: 2x2 grid */
-          .admin-stats {
-            grid-template-columns: 1fr 1fr !important;
-            gap: 10px !important;
-          }
-
-          .admin-stats > div {
-            padding: 14px 12px !important;
-          }
-
-          .admin-stats > div > div:first-child {
-            font-size: 9px !important;
-            margin-bottom: 4px !important;
-          }
-
-          .admin-stats > div > div:last-child {
-            font-size: 24px !important;
-          }
-
-          /* Main: single column, controls first then queue */
-          .admin-main {
-            grid-template-columns: 1fr !important;
-            gap: 14px !important;
-          }
-
-          /* Queue list: remove fixed height on mobile */
-          .admin-main > div:last-child > div[style*="maxHeight"] {
-            max-height: none !important;
-          }
-
-          /* Header clinic buttons: smaller */
-          .admin-main button {
-            font-size: 11px !important;
-          }
-
-          /* Queue rows: tighter padding */
-          .admin-main > div:last-child > div > div[style*="borderBottom"] {
-            padding: 12px 14px !important;
-            gap: 10px !important;
-          }
-
-          /* Token circle: slightly smaller */
-          .admin-main > div:last-child > div > div > div:first-child {
-            width: 34px !important;
-            height: 34px !important;
-            font-size: 12px !important;
-          }
-
-          /* Inputs on mobile: prevent iOS zoom */
-          input, select, textarea {
-            font-size: 16px !important;
-          }
+          .admin-stats { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+          .admin-stats > div { padding: 14px 12px !important; }
+          .admin-stats > div > div:first-child { font-size: 9px !important; margin-bottom: 4px !important; }
+          .admin-stats > div > div:last-child { font-size: 24px !important; }
+          .admin-main { grid-template-columns: 1fr !important; gap: 14px !important; }
+          input, select, textarea { font-size: 16px !important; }
         }
       `}</style>
     </div>
