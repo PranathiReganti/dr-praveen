@@ -25,7 +25,7 @@ export default function AdminDashboard() {
 
     const fetchQueue = async () => {
       try {
-        const json = await apiRequest('/api/queue')
+        const json = await apiRequest(`/queue?clinic=${clinicId}`)
         if (!mounted) return
         setQueueData(json?.data ?? null)
       } catch {
@@ -40,7 +40,7 @@ export default function AdminDashboard() {
     fetchQueue()
     intervalId = setInterval(fetchQueue, 4000)
     return () => { mounted = false; if (intervalId) clearInterval(intervalId) }
-  }, [])
+  }, [clinicId])
 
   const apiPatients = Array.isArray(queueData?.patients) ? queueData.patients : []
   const waiting     = apiPatients.filter(p => p.status === 'waiting')
@@ -52,7 +52,7 @@ export default function AdminDashboard() {
     if (!form.name || !form.phone || !form.reason) return
     setAdding(true)
     try {
-      await apiRequest('/api/queue/add', {
+      await apiRequest('/queue/add', {
         method: 'POST',
         body: JSON.stringify({ name: form.name, phone: form.phone, reason: form.reason, clinic: clinicId })
       })
@@ -64,14 +64,14 @@ export default function AdminDashboard() {
   }
 
   async function callNext() {
-    await apiRequest('/api/queue/next', { method: 'POST' })
+    await apiRequest('/queue/next', { method: 'POST' })
   }
 
   async function markDone() {
     if (!serving?.tokenNumber || completeLoading) return
     setCompleteLoading(true)
     try {
-      const json = await apiRequest(`/api/queue/complete/${serving.tokenNumber}`, { method: 'PATCH' })
+      const json = await apiRequest(`/queue/complete/${serving.tokenNumber}`, { method: 'PATCH' })
       setQueueData(json?.data ?? null)
     } catch (e) {
       console.error(e)

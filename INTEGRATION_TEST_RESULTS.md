@@ -113,9 +113,9 @@ Result:
 
 **Backend API Calls Made**:
 
-- POST /api/auth/login → Token generated
-- POST /api/payment/create-order → Order ID returned
-- POST /api/payment/verify → Payment verified
+- POST /auth/login → Token generated
+- POST /payment/create-order → Order ID returned
+- POST /payment/verify → Payment verified
 - POST /api/queue/add → Token generated
 
 ---
@@ -259,11 +259,11 @@ Firebase Firestore Connection Errors:
 
 ### API Integration
 
-- ✅ /api/auth/login
+- ✅ /auth/login
 - ✅ /api/queue/get (queue status)
 - ✅ /api/queue/add (token booking)
-- ✅ /api/payment/create-order
-- ✅ /api/payment/verify
+- ✅ /payment/create-order
+- ✅ /payment/verify
 
 ---
 

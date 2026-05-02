@@ -22,7 +22,7 @@ export default function DoctorDashboard() {
 
     const fetchQueue = async () => {
       try {
-        const json = await apiRequest('/api/queue')
+        const json = await apiRequest(`/queue?clinic=${clinic}`)
         if (!mounted) return
         setQueueData(json?.data ?? null)
       } catch {
@@ -41,14 +41,14 @@ export default function DoctorDashboard() {
       mounted = false
       if (intervalId) clearInterval(intervalId)
     }
-  }, [])
+  }, [clinic])
 
   async function markDone(tokenNumber) {
     if (!tokenNumber) return
     if (completeLoading) return
     setCompleteLoading(true)
     try {
-      const json = await apiRequest(`/api/queue/complete/${tokenNumber}`, { method: 'PATCH' })
+      const json = await apiRequest(`/queue/complete/${tokenNumber}`, { method: 'PATCH' })
       setQueueData(json?.data ?? null)
     } catch (e) {
       console.error(e)
@@ -126,7 +126,7 @@ export default function DoctorDashboard() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '20px', fontWeight: '700', color: '#0A1628', fontFamily: "'Cormorant Garamond',serif" }}>{serving.name}</div>
-                  <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>📞 {serving.phone}</div>
+                  <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}> {serving.phone}</div>
                 </div>
                 <span style={{ background: '#FEF3C7', color: '#92400E', padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>🔔 Now Consulting</span>
               </div>

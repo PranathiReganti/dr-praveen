@@ -66,7 +66,7 @@ Open browser DevTools (F12) and check console for connection diagnostics:
 
 ### Authentication
 
-- **POST** `/api/auth/login`
+- **POST** `/auth/login`
   - Request: `{username, password}`
   - Response: `{token, role, message}`
   - Test: admin/1234 or doctor/5678
@@ -79,8 +79,8 @@ Open browser DevTools (F12) and check console for connection diagnostics:
 
 ### Payments
 
-- **POST** `/api/payment/create-order` - Create payment order
-- **POST** `/api/payment/verify` - Verify payment
+- **POST** `/payment/create-order` - Create payment order
+- **POST** `/payment/verify` - Verify payment
 
 ### Health Check
 
@@ -225,7 +225,7 @@ Output includes:
 ```
 1. Go to http://localhost:3001/login
 2. Enter credentials: admin / 1234
-3. Check DevTools Network → POST /api/auth/login
+3. Check DevTools Network → POST /auth/login
 4. Verify response contains token
 5. Check localStorage has token stored
 6. Should redirect to /admin dashboard

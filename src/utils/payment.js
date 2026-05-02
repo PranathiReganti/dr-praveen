@@ -12,7 +12,7 @@ import { apiRequest } from './api'
  */
 export async function createPaymentOrder(amount = 500) {
   try {
-    return await apiRequest('/api/payment/create-order', {
+    return await apiRequest('/payment/create-order', {
       method: 'POST',
       body: JSON.stringify({ amount })
     })
@@ -29,7 +29,7 @@ export async function createPaymentOrder(amount = 500) {
  */
 export async function verifyPayment(paymentDetails) {
   try {
-    return await apiRequest('/api/payment/verify', {
+    return await apiRequest('/payment/verify', {
       method: 'POST',
       body: JSON.stringify(paymentDetails)
     })

@@ -18,7 +18,7 @@
 // ✅ BEFORE - Manual fetch
 import { useState } from 'react'
 async function handleLogin(username, password) {
-  const response = await fetch('/api/auth/login', {
+  const response = await fetch('/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
@@ -32,7 +32,7 @@ async function handleLogin(username, password) {
 // ✅ AFTER - Using apiFetch
 import { apiFetch } from '../utils/api'
 async function handleLogin(username, password) {
-  const response = await apiFetch('/api/auth/login', {
+  const response = await apiFetch('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ username, password })
   })
@@ -49,7 +49,7 @@ async function handleLogin(username, password) {
 import { apiFetch } from '../utils/api'
 
 async function generateToken() {
-  const response = await apiFetch('/api/queue/add', {
+  const response = await apiFetch('/queue/add', {
     method: 'POST',
     body: JSON.stringify({
       name: formData.name,
@@ -81,7 +81,7 @@ import { apiFetch } from '../utils/api'
 
 async function fetchQueueStatus() {
   try {
-    const response = await apiFetch('/api/queue')
+    const response = await apiFetch('/queue')
     const result = await response.json()
     
     if (response.ok && result.data) {
@@ -105,7 +105,7 @@ import { apiFetchJson } from '../utils/api'
 async function fetchQueueData() {
   try {
     // This will throw if not response.ok
-    const data = await apiFetchJson('/api/queue')
+    const data = await apiFetchJson('/queue')
     setQueueData(data.data)
   } catch (error) {
     // error.status = HTTP status code
@@ -125,7 +125,7 @@ import { apiFetch } from '../utils/api'
 
 // Admin dashboard - requires token
 async function getAdminDashboardData() {
-  const response = await apiFetch('/api/admin/dashboard', {
+  const response = await apiFetch('/admin/dashboard', {
     method: 'GET'
   })
   
@@ -147,7 +147,7 @@ import { apiRequest } from '../utils/api'
 // With error callback
 async function syncData() {
   const data = await apiRequest(
-    '/api/queue/add',
+    '/queue/add',
     {
       method: 'POST',
       body: JSON.stringify({ name, phone, reason, clinic })
@@ -174,8 +174,8 @@ async function syncData() {
  * 
  * How to update more components:
  * 1. Import: import { apiFetch } from '../utils/api'
- * 2. Replace: fetch(`/api/...`)
- *    With: apiFetch('/api/...')
+ * 2. Replace: fetch(`/...`)
+ *    With: apiFetch('/...')
  * 3. Test: Verify requests include Authorization header in DevTools
  */
 

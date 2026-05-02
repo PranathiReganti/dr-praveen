@@ -94,7 +94,7 @@ export default function Queue() {
     setLoading(true); setError('')
     try {
       // Call backend API to generate token
-      const result = await apiRequest('/api/queue/add', {
+      const result = await apiRequest('/queue/add', {
         method: 'POST',
         body: JSON.stringify({
           name: form.name,

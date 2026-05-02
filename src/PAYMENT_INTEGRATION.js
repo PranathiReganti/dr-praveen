@@ -19,7 +19,7 @@
  *   → Button: "Proceed to Payment" (calls createOrder)
  * 
  * Step 3a: Create Order
- *   → POST /api/payment/create-order with {amount: 500}
+ *   → POST /payment/create-order with {amount: 500}
  *   → Backend generates orderId
  *   → Response: {orderId, amount, currency}
  *   → Automatically advances to Step 4
@@ -35,7 +35,7 @@
  *     - Show "Processing Payment..." message
  * 
  * Step 4a: Verify Payment
- *   → POST /api/payment/verify with {orderId, paymentId, signature}
+ *   → POST /payment/verify with {orderId, paymentId, signature}
  *   → Backend validates payment
  *   → Response: {success, message, transactionId}
  *   → Status → "success"
@@ -43,7 +43,7 @@
  * 
  * Step 4b: Generate Token
  *   → Automatically calls generateToken() after 1.5 second delay
- *   → POST /api/queue/add with {name, phone, reason, clinic}
+ *   → POST /queue/add with {name, phone, reason, clinic}
  *   → Backend generates tokenNumber
  *   → Send SMS with token number
  *   → Advance to Step 5
@@ -116,12 +116,12 @@ const result = await verifyPayment({orderId, paymentId, signature})
  * BACKEND REQUIREMENTS
  */
 
-// POST /api/payment/create-order
+// POST /payment/create-order
 // Body: {amount}
 // Response: {success, orderId, amount, currency, message}
 // Status: 201 Created
 
-// POST /api/payment/verify
+// POST /payment/verify
 // Body: {orderId, paymentId, signature}
 // Response: {success, message, orderId, paymentId, amount, transactionId}
 // Status: 200 OK
