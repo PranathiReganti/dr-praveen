@@ -108,9 +108,9 @@ app.get('/', (req, res) => {
 // ============================================
 // API ROUTES
 // ============================================
-app.use('/api/auth', authRoutes)
+app.use('/auth', authRoutes)
 app.use('/api/queue', queueRoutes)
-app.use('/api/payment', paymentRoutes)
+app.use('/payment', paymentRoutes)
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -130,9 +130,9 @@ app.get('/api', (req, res) => {
     endpoints: {
       root: '/',
       health: '/api/health',
-      auth: '/api/auth',
+      auth: '/auth',
       queue: '/api/queue',
-      payment: '/api/payment'
+      payment: '/payment'
     },
     documentation: 'See individual route files for endpoint details'
   })

@@ -4,12 +4,12 @@
  */
 
 // Centralized API base URL for the Render backend.
-const API_BASE_URL = "https://dr-praveen.onrender.com";
+const API_BASE_URL = "http://localhost:5000/api";
 const API_TIMEOUT = 30000;
 
 /**
  * Enhanced fetch function with automatic JWT authentication and timeout.
- * @param {string} url - API endpoint (e.g., '/api/queue')
+ * @param {string} url - API endpoint (e.g., '/queue')
  * @param {Object} options - Fetch options (method, body, headers, etc.)
  * @returns {Promise<Response>} - The raw Fetch response object.
  */

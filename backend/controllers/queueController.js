@@ -57,18 +57,24 @@ export const seedDemoQueue = () => {
  */
 export const getQueueData = async (req, res) => {
   try {
-    // Count waiting tokens
-    const waitingTokens = queueArray.filter(token => token.status === 'waiting')
+    const { clinic } = req.query
+    console.log('CLINIC QUERY:', clinic)
+
+    const filteredQueue = clinic
+      ? queueArray.filter(token => token.clinic === clinic)
+      : queueArray
+
+    const waitingTokens = filteredQueue.filter(token => token.status === 'waiting')
     const waitingCount = waitingTokens.length
 
-    // Calculate estimated time: waiting count * 5 minutes
     const estimatedTime = waitingCount * 5
 
-    // Get current serving token
-    const serving = currentServingToken || queueArray.find(token => token.status === 'serving')
-    const currentToken = serving ? serving.tokenNumber : (queueArray.length > 0 ? queueArray[0].tokenNumber : 0)
+    const serving = filteredQueue.find(token => token.status === 'serving')
+    const currentToken = serving
+      ? serving.tokenNumber
+      : (filteredQueue.length > 0 ? filteredQueue[0].tokenNumber : 0)
 
-    const patients = queueArray.map(p => ({
+    const patients = filteredQueue.map(p => ({
       tokenNumber: p.tokenNumber,
       name: p.name,
       phone: p.phone,
@@ -84,20 +90,12 @@ export const getQueueData = async (req, res) => {
       patients
     }
 
-    console.log('[QUEUE STATUS]', {
-      currentToken,
-      waitingCount,
-      estimatedTime: `${estimatedTime} mins`,
-      totalInQueue: queueArray.length
-    })
-
     res.status(200).json({
       success: true,
       data: queueData,
       message: 'Queue data retrieved'
     })
   } catch (error) {
-    console.error('[QUEUE ERROR]', error)
     res.status(500).json({
       error: 'Internal Server Error',
       message: error.message
@@ -114,6 +112,7 @@ export const getQueueData = async (req, res) => {
 export const addToken = async (req, res) => {
   try {
     const { name, phone, reason, clinic } = req.body
+    console.log("CLINIC RECEIVED:", clinic)
 
     console.log('[DEBUG] addToken called', { name, phone, reason, clinic })
     console.log('[DEBUG] nextTokenNumber BEFORE increment:', nextTokenNumber)

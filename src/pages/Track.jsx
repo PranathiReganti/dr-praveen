@@ -23,7 +23,7 @@ export default function Track() {
   async function fetchQueueStatus() {
     try {
       setQueueLoading(true)
-      const result = await apiRequest('/api/queue')
+      const result = await apiRequest('/queue')
       
       if (result.data) {
         setQueueStatus(result.data)

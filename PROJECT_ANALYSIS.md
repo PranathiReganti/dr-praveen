@@ -455,37 +455,37 @@ Missing:
 
 #### **1. Authentication APIs**
 ```
-POST /api/auth/register
+POST /auth/register
   ├─ Input: email, password, role, name, phone
   ├─ Output: token, user_id, role
   └─ Purpose: Create new account
 
-POST /api/auth/login
+POST /auth/login
   ├─ Input: email, password
   ├─ Output: token, user_id, role, expires_in
   └─ Purpose: Authenticate user
 
-POST /api/auth/logout
+POST /auth/logout
   ├─ Input: token
   ├─ Output: success message
   └─ Purpose: Invalidate session
 
-POST /api/auth/refresh-token
+POST /auth/refresh-token
   ├─ Input: refresh_token
   ├─ Output: new access_token
   └─ Purpose: Renew expired token
 
-GET /api/auth/verify
+GET /auth/verify
   ├─ Input: token (header)
   ├─ Output: user data, permissions
   └─ Purpose: Verify token validity
 
-POST /api/auth/forgot-password
+POST /auth/forgot-password
   ├─ Input: email
   ├─ Output: success message
   └─ Purpose: Send password reset email
 
-POST /api/auth/reset-password
+POST /auth/reset-password
   ├─ Input: token, new_password
   ├─ Output: success message
   └─ Purpose: Reset password
@@ -607,17 +607,17 @@ GET /api/consultations/:id/prescription
 
 #### **5. Payment APIs**
 ```
-POST /api/payments/initiate
+POST /payments/initiate
   ├─ Input: appointment_id, amount
   ├─ Output: payment_id, payment_url (Razorpay/Stripe link)
   └─ Purpose: Initiate payment
 
-POST /api/payments/verify
+POST /payments/verify
   ├─ Input: payment_id, transaction_id, signature
   ├─ Output: payment_status (success/failed)
   └─ Purpose: Verify payment completion
 
-GET /api/payments/:id
+GET /payments/:id
   ├─ Input: payment_id
   ├─ Output: payment details
   └─ Purpose: Get payment status
@@ -627,7 +627,7 @@ GET /api/invoices/:id
   ├─ Output: invoice PDF data
   └─ Purpose: Generate/download invoice
 
-POST /api/payments/:id/refund
+POST /payments/:id/refund
   ├─ Input: payment_id, amount (optional)
   ├─ Output: refund_id, status
   └─ Purpose: Process refund

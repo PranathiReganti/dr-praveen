@@ -47,7 +47,7 @@ async function runPaymentTests() {
   try {
     // Step 1: Create payment order
     console.log('📝 Step 1: Creating payment order...');
-    const createResp = await makeRequest('POST', '/api/payment/create-order', { amount: 500 });
+    const createResp = await makeRequest('POST', '/payment/create-order', { amount: 500 });
     const orderId = createResp.body.orderId;
     console.log(`✓ Order created: ${orderId}`);
     console.log(`  Amount: ₹${createResp.body.amount}`);
@@ -70,7 +70,7 @@ async function runPaymentTests() {
     console.log('\n🔐 Step 3: Verifying payment with backend (0.5-1 second delay)...');
     const verifyStart = Date.now();
     
-    const verifyResp = await makeRequest('POST', '/api/payment/verify', {
+    const verifyResp = await makeRequest('POST', '/payment/verify', {
       orderId,
       paymentId,
       signature
@@ -98,7 +98,7 @@ async function runPaymentTests() {
 
     for (let i = 1; i <= 10; i++) {
       // Create order
-      const orderResp = await makeRequest('POST', '/api/payment/create-order', { amount: 500 });
+      const orderResp = await makeRequest('POST', '/payment/create-order', { amount: 500 });
       const testOrderId = orderResp.body.orderId;
       
       // Simulate payment
@@ -111,7 +111,7 @@ async function runPaymentTests() {
       const testSignature = `sig_${Math.random().toString(36).substr(2, 20)}`;
       
       // Verify with backend
-      const testVerifyResp = await makeRequest('POST', '/api/payment/verify', {
+      const testVerifyResp = await makeRequest('POST', '/payment/verify', {
         orderId: testOrderId,
         paymentId: testPaymentId,
         signature: testSignature

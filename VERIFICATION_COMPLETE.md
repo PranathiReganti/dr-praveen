@@ -131,7 +131,7 @@ if (error instanceof TypeError && error.message.includes('fetch')) {
 
 #### Test 2: Authentication (Admin Login)
 
-- **Endpoint:** POST `/api/auth/login`
+- **Endpoint:** POST `/auth/login`
 - **Credentials:** admin/1234
 - **Status:** ✅ Success
 - **Response:**
@@ -145,8 +145,8 @@ if (error instanceof TypeError && error.message.includes('fetch')) {
 - **Steps:** Clinic selection → Form filling → Confirmation → Payment → Token Generation
 - **Status:** ✅ Complete Success
 - **API Calls Made:**
-  1. POST `/api/payment/create-order` → Order ID generated
-  2. POST `/api/payment/verify` → Payment verified
+  1. POST `/payment/create-order` → Order ID generated
+  2. POST `/payment/verify` → Payment verified
   3. POST `/api/queue/add` → Token #775 generated
 - **SMS Notification:** Sent to 9876543210
 - **Token Display:** #775 for DiaPlus clinic

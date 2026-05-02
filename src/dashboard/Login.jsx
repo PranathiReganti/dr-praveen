@@ -28,7 +28,7 @@ export default function Login() {
       }
 
       // Send login request to backend
-      const data = await apiRequest('/api/auth/login', {
+      const data = await apiRequest('/auth/login', {
         method: 'POST',
         body: JSON.stringify({
           username: role,

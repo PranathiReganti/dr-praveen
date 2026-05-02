@@ -24,7 +24,7 @@ export default function QueuePreview() {
   async function fetchQueueData() {
     try {
       setLoading(true)
-      const response = await apiFetch('/api/queue')
+      const response = await apiFetch('/queue')
       const result = await response.json()
       
       if (response.ok && result.data) {
