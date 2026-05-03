@@ -24,10 +24,10 @@ export const seedDemoQueue = () => {
 
   const now = Date.now()
   const demoPatients = [
-    { name: 'Aarav Sharma', phone: '9876543210', reason: 'Fever and body ache', clinic: 'general' },
-    { name: 'Meera Iyer', phone: '9123456780', reason: 'Follow-up consultation', clinic: 'general' },
-    { name: 'Rohan Verma', phone: '9988776655', reason: 'Stomach pain', clinic: 'general' },
-    { name: 'Neha Gupta', phone: '9012345678', reason: 'Skin allergy', clinic: 'general' }
+    { name: 'Aarav Sharma', phone: '9876543210', reason: 'Diabetes Checkup', clinic: 'diaplus' },
+    { name: 'Meera Iyer', phone: '9123456780', reason: 'Thyroid Consultation', clinic: 'thyroplus' },
+    { name: 'Rohan Verma', phone: '9988776655', reason: 'PCOS / PCOD', clinic: 'diaplus' },
+    { name: 'Neha Gupta', phone: '9012345678', reason: 'Hormone Imbalance', clinic: 'thyroplus' }
   ]
 
   queueArray = demoPatients.map((p, idx) => ({

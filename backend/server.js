@@ -108,9 +108,9 @@ app.get('/', (req, res) => {
 // ============================================
 // API ROUTES
 // ============================================
-app.use('/auth', authRoutes)
+app.use('/api/auth', authRoutes)
 app.use('/api/queue', queueRoutes)
-app.use('/payment', paymentRoutes)
+app.use('/api/payment', paymentRoutes)
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
