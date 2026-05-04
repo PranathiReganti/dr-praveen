@@ -1,6 +1,8 @@
 /**
  * Environment Configuration
  * Centralized configuration for frontend
+ * 
+ * API: All requests to Render production backend
  */
 
 const ENV = import.meta.env.MODE || 'development'
