@@ -21,7 +21,7 @@ export default function DoctorDashboard() {
 
     const fetchQueue = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/queue')
+        const res = await fetch('https://dr-praveen.onrender.com/api/queue')
         const json = await res.json()
         if (!mounted) return
         setQueueData(json?.data ?? null)
@@ -48,7 +48,7 @@ export default function DoctorDashboard() {
     if (completeLoading) return
     setCompleteLoading(true)
     try {
-      const res = await fetch(`http://localhost:5000/api/queue/complete/${tokenNumber}`, {
+      const res = await fetch(`https://dr-praveen.onrender.com/api/queue/complete/${tokenNumber}`, {
         method: 'PATCH'
       })
       if (!res.ok) throw new Error('Failed to complete consultation')

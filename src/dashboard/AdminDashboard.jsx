@@ -25,7 +25,7 @@ export default function AdminDashboard() {
 
     const fetchQueue = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/queue')
+        const res = await fetch('https://dr-praveen.onrender.com/api/queue')
         const json = await res.json()
         if (!mounted) return
         setQueueData(json?.data ?? null)
@@ -57,7 +57,7 @@ export default function AdminDashboard() {
     if (!form.name || !form.phone || !form.reason) return
     setAdding(true)
     try {
-      await fetch('http://localhost:5000/api/queue/add', {
+      await fetch('https://dr-praveen.onrender.com/api/queue/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -76,7 +76,7 @@ export default function AdminDashboard() {
   }
 
   async function callNext() {
-    await fetch('http://localhost:5000/api/queue/next', {
+    await fetch('https://dr-praveen.onrender.com/api/queue/next', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({})
@@ -88,7 +88,7 @@ export default function AdminDashboard() {
     if (completeLoading) return
     setCompleteLoading(true)
     try {
-      const res = await fetch(`http://localhost:5000/api/queue/complete/${serving.tokenNumber}`, {
+      const res = await fetch(`https://dr-praveen.onrender.com/api/queue/complete/${serving.tokenNumber}`, {
         method: 'PATCH'
       })
       if (!res.ok) throw new Error('Failed to complete consultation')
