@@ -178,57 +178,25 @@ export async function sendSMS(phone, message) {
  * @param {string} trackingUrl - Optional tracking URL for live queue status
  * @returns {Promise<Object>} - SMS send result
  */
-export async function sendAppointmentSMS(phone, patientName, token, waitTime, reason, trackingUrl = null) {
-  try {
-    console.log('\n' + '='.repeat(70))
-    console.log('[APPOINTMENT SMS] Starting appointment notification...')
-    console.log('='.repeat(70))
+export async function sendAppointmentSMS(phone, patientName, token, waitTime, reason, trackingLink) {
+  const message = `Hi ${patientName},
 
-    const appointmentData = {
-      patientName,
-      phone,
-      token,
-      waitTime,
-      reason,
-      trackingUrl
-    }
+Your appointment token at Dr. Praveen's DiaPlus Clinic is confirmed.
 
-    console.log('\n[APPOINTMENT DATA]')
-    console.log('  Patient Name:', patientName)
-    console.log('  Phone:', phone)
-    console.log('  Token:', token)
-    console.log('  Wait Time:', waitTime, 'mins')
-    console.log('  Reason:', reason)
-    console.log('  Tracking URL:', trackingUrl || 'Not provided')
+Token: #${token}
+Clinic: DiaPlus
+Estimated Wait: ${waitTime} mins
+Reason: ${reason}
 
-    // Format message exactly as specified
-    let message = `Hi ${patientName}, your token is ${token}. Track your position: ${trackingUrl}. - Dr. Praveen Ramachandra`
+Please arrive on time and keep your token number safe.
 
-    console.log('\n[MESSAGE CONTENT]')
-    console.log(message)
+Track your queue:
+${trackingLink}
 
-    // Send SMS
-    console.log('\n[SENDING SMS...]')
-    const result = await sendSMS(phone, message)
+- Dr. Praveen Ramachandra
+Endocrinologist`;
 
-    console.log('\n[APPOINTMENT SMS RESULT]')
-    console.log('  Success:', result.success)
-    if (result.success) {
-      console.log('  Message SID:', result.data.messageSid)
-      console.log('  Status:', result.data.status)
-    } else {
-      console.log('  Error:', result.error)
-    }
-    console.log('='.repeat(70) + '\n')
-
-    return result
-  } catch (error) {
-    console.error('[APPOINTMENT SMS ERROR]', error.message)
-    return {
-      success: false,
-      error: error.message
-    }
-  }
+  return await sendSMS(phone, message);
 }
 
 /**
@@ -238,55 +206,28 @@ export async function sendAppointmentSMS(phone, patientName, token, waitTime, re
  * @returns {Promise<Object>} - SMS send result
  */
 export async function sendTokenNotificationSMS(tokenData) {
-  try {
-    console.log('\n' + '='.repeat(70))
-    console.log('[TOKEN NOTIFICATION SMS] Processing token notification...')
-    console.log('='.repeat(70))
+  const { name, phone, tokenNumber, clinic, estimatedTime, reason } = tokenData;
+  const trackingLink = `https://dr-praveen.onrender.com/track?phone=${phone}`;
+  const waitTimeNum = typeof estimatedTime === 'string' ? estimatedTime.replace(/\D/g, '') || '0' : estimatedTime;
 
-    const { name, phone, tokenNumber, clinic, estimatedTime, reason, trackingUrl } = tokenData
+  const message = `Hi ${name},
 
-    console.log('\n[TOKEN DATA]')
-    console.log('  Name:', name)
-    console.log('  Phone:', phone)
-    console.log('  Token Number:', tokenNumber)
-    console.log('  Clinic:', clinic)
-    console.log('  Estimated Time:', estimatedTime)
-    console.log('  Reason:', reason)
-    console.log('  Tracking URL:', trackingUrl || 'Not provided')
+Your appointment token at Dr. Praveen's DiaPlus Clinic is confirmed.
 
-    // Extract wait time number from estimated time string if needed
-    let waitTimeNum = estimatedTime
-    if (typeof estimatedTime === 'string') {
-      waitTimeNum = estimatedTime.replace(/\D/g, '') || '0'
-    }
+Token: #${String(tokenNumber).padStart(2, '0')}
+Clinic: ${clinic}
+Estimated Wait: ${waitTimeNum} mins
+Reason: ${reason}
 
-    // Call the main appointment SMS function with tracking URL
-    const result = await sendAppointmentSMS(
-      phone, 
-      name, 
-      `#${String(tokenNumber).padStart(2, '0')}`, 
-      waitTimeNum, 
-      reason,
-      trackingUrl
-    )
+Please arrive on time and keep your token number safe.
 
-    console.log('\n[TOKEN SMS RESULT]')
-    console.log('  Success:', result.success)
-    if (result.success) {
-      console.log('  Message SID:', result.data.messageSid)
-    } else {
-      console.log('  Error:', result.error)
-    }
-    console.log('='.repeat(70) + '\n')
+Track your queue:
+${trackingLink}
 
-    return result
-  } catch (error) {
-    console.error('[TOKEN NOTIFICATION ERROR]', error.message)
-    return {
-      success: false,
-      error: error.message
-    }
-  }
+- Dr. Praveen Ramachandra
+Endocrinologist`;
+
+  return await sendSMS(phone, message);
 }
 
-export default { sendSMS, sendAppointmentSMS, sendTokenNotificationSMS }
+export default { sendSMS, sendAppointmentSMS, sendTokenNotificationSMS };
