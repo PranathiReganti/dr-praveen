@@ -18,6 +18,7 @@ const API_TIMEOUT = config.API_TIMEOUT;
  */
 export async function apiFetch(url, options = {}) {
   const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  console.log(`[apiFetch] Starting request to ${fullUrl}`, { method: options.method || 'GET', bodySize: options.body ? options.body.length : 0 })
 
   const headers = { ...options.headers };
 
@@ -28,6 +29,7 @@ export async function apiFetch(url, options = {}) {
   const token = localStorage.getItem('token');
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+    console.log(`[apiFetch] Authorization token attached`)
   }
 
   const finalOptions = { ...options, headers };
@@ -36,8 +38,10 @@ export async function apiFetch(url, options = {}) {
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
   try {
+    console.log(`[apiFetch] Sending fetch request to ${fullUrl}`)
     const response = await fetch(fullUrl, { ...finalOptions, signal: controller.signal });
     clearTimeout(timeoutId);
+    console.log(`[apiFetch] Response received. Status: ${response.status}, Headers:`, Object.fromEntries(response.headers))
     return response;
   } catch (error) {
     clearTimeout(timeoutId);
@@ -56,15 +60,20 @@ export async function apiFetch(url, options = {}) {
  * @returns {Promise<Object>} - Parsed JSON response body.
  */
 export async function apiFetchJson(url, options = {}) {
+  console.log(`[apiFetchJson] Calling apiFetch for ${url}`)
   const response = await apiFetch(url, options);
+  console.log(`[apiFetchJson] Response status: ${response.status}`)
 
   if (response.status === 204) {
+    console.log(`[apiFetchJson] 204 No Content - returning null`)
     return null;
   }
 
   let data;
   try {
+    console.log(`[apiFetchJson] Parsing JSON response...`)
     data = await response.json();
+    console.log(`[apiFetchJson] JSON parsed successfully:`, data)
   } catch (error) {
     console.error(`[JSON PARSE ERROR] ${url}:`, error);
     throw new Error(`Invalid response format from server.`);
@@ -79,6 +88,7 @@ export async function apiFetchJson(url, options = {}) {
     throw error;
   }
 
+  console.log(`[apiFetchJson] Returning parsed data`)
   return data;
 }
 

@@ -41,28 +41,43 @@ export default function Queue() {
    * Simulate payment and verify with backend
    */
   async function processPayment() {
+    console.log('\n[PAYMENT FLOW] ===== STARTING PAYMENT PROCESS =====')
     setPaymentStatus('processing')
     setError('')
     setLoading(true)
     
     try {
       // Simulate Razorpay payment (1-2 second delay, 10% failure rate)
+      console.log('[PAYMENT FLOW] Step 1: Calling simulateRazorpayPayment()')
       const paymentDetails = await simulateRazorpayPayment(paymentOrder.orderId)
+      console.log('[PAYMENT FLOW] Step 2: Payment simulation complete. Details:', paymentDetails)
       
       // Verify payment with backend
+      console.log('[PAYMENT FLOW] Step 3: Calling verifyPayment() with details:', paymentDetails)
       const verifyResult = await verifyPayment(paymentDetails)
+      console.log('[PAYMENT FLOW] Step 4: Verify payment response:', verifyResult)
       
       if (verifyResult.success) {
+        console.log('[PAYMENT FLOW] Step 5: Payment verified successfully. Setting status to success.')
         setPaymentStatus('success')
         // Proceed to token generation after 1.5 second delay to show success message
-        setTimeout(() => generateToken(), 1500)
+        console.log('[PAYMENT FLOW] Step 6: Scheduling generateToken() to run in 1500ms...')
+        const timeoutId = setTimeout(() => {
+          console.log('[PAYMENT FLOW] Step 7: Timeout fired! Calling generateToken() now.')
+          generateToken()
+        }, 1500)
+        console.log('[PAYMENT FLOW] Step 6b: Timeout scheduled with ID:', timeoutId)
       } else {
+        console.error('[PAYMENT FLOW] Payment verification returned success=false:', verifyResult)
         setPaymentStatus('failed')
         setError(verifyResult.message || 'Payment verification failed. Please try again.')
         setLoading(false)
       }
     } catch (e) {
-      console.error('[PAYMENT ERROR]', e)
+      console.error('[PAYMENT ERROR] Exception in processPayment():', e)
+      console.error('[PAYMENT ERROR] Error name:', e.name)
+      console.error('[PAYMENT ERROR] Error message:', e.message)
+      console.error('[PAYMENT ERROR] Error stack:', e.stack)
       setPaymentStatus('failed')
       setError(e.message || 'Payment processing failed. Please try again.')
       setLoading(false)
@@ -82,32 +97,68 @@ export default function Queue() {
    * Generate token after successful payment
    */
   async function generateToken() {
-    setLoading(true); setError('')
+    console.log('\n[TOKEN FLOW] ===== STARTING TOKEN GENERATION =====')
+    console.log('[TOKEN FLOW] Current form data:', form)
+    console.log('[TOKEN FLOW] Current clinic:', clinic)
+    
+    setLoading(true)
+    setError('')
     try {
       // Call backend API to generate token
+      console.log('[TOKEN FLOW] Step 1: Preparing API request to /queue/add')
+      const requestBody = {
+        name: form.name,
+        phone: form.phone,
+        reason: form.reason,
+        clinic: clinic,
+        trackingUrl: `${window.location.origin}/track?phone=${form.phone}`
+      }
+      console.log('[TOKEN FLOW] Step 2: Request body prepared:', requestBody)
+      
+      console.log('[TOKEN FLOW] Step 3: Calling apiRequest("/queue/add") ...')
       const result = await apiRequest('/queue/add', {
         method: 'POST',
-        body: JSON.stringify({
-          name: form.name,
-          phone: form.phone,
-          reason: form.reason,
-          clinic: clinic,
-          trackingUrl: `${window.location.origin}/track?phone=${form.phone}`
-        })
+        body: JSON.stringify(requestBody)
       })
 
-      if (!result) {
-        setError('Failed to generate token. Please try again.')
+      console.log('[TOKEN FLOW] Step 4: API response received:', result)
+
+      if (!result || !result.success) {
+        console.error('[TOKEN FLOW] ERROR: API returned failed status or null result')
+        console.error('[TOKEN FLOW] Response:', result)
+        const errorMsg = result?.message || 'Failed to generate token. Please try again.'
+        setError(errorMsg)
         setLoading(false)
         return
       }
 
-      const tokenNum = result.data.tokenNumber
+      console.log('[TOKEN FLOW] Step 5: Extracting token number from result...')
+      const tokenNum = result.data?.tokenNumber
+      console.log('[TOKEN FLOW] Step 6: Token number extracted:', tokenNum)
+      
+      if (!tokenNum) {
+        console.error('[TOKEN FLOW] ERROR: tokenNumber not found in response. Full response:', result)
+        setError('Invalid response from server. Please try again.')
+        setLoading(false)
+        return
+      }
+      
+      console.log('[TOKEN FLOW] Step 7: Setting token state to:', tokenNum)
       setToken(tokenNum)
+      
+      console.log('[TOKEN FLOW] Step 8: Moving to step 5 (success screen)')
       setStep(5) // Final success screen
+      
+      console.log('[TOKEN FLOW] ===== TOKEN GENERATION COMPLETE =====\n')
     } catch (e) {
-      console.error('[TOKEN GENERATION ERROR]', e)
-      setError('Something went wrong. Please try again.')
+      console.error('[TOKEN GENERATION ERROR] Exception caught:', e)
+      console.error('[TOKEN GENERATION ERROR] Error name:', e.name)
+      console.error('[TOKEN GENERATION ERROR] Error message:', e.message)
+      console.error('[TOKEN GENERATION ERROR] Error status:', e.status)
+      console.error('[TOKEN GENERATION ERROR] Error data:', e.data)
+      console.error('[TOKEN GENERATION ERROR] Error stack:', e.stack)
+      const errorMsg = e.data?.message || e.message || 'Something went wrong. Please try again.'
+      setError(errorMsg)
     }
     setLoading(false)
   }

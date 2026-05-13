@@ -2,7 +2,9 @@
 // Handles queue management, token booking, and queue tracking
 
 import { sendTokenNotificationSMS } from '../utils/smsService.js'
+import { PrismaClient } from '@prisma/client'
 
+const prisma = new PrismaClient()
 // ===== IN-MEMORY QUEUE STATE =====
 // Stores all tokens for today's queue
 // Persists while server is running, resets on restart
@@ -148,7 +150,101 @@ export const addToken = async (req, res) => {
       timestamp: new Date().toISOString(),
       status: 'waiting'
     }
+try {
+  console.log('[PRISMA] Starting database insert')
 
+    console.log('[DB STEP 1] Searching patient with phone:', phone)
+
+    let patient = await prisma.patient.findUnique({
+      where: {
+        phone: String(phone)
+      }
+    })
+
+    console.log('[DB STEP 2] Existing patient result:', patient)
+
+    console.log('[DB STEP 3] Finding or creating clinic')
+    
+    const clinicRecord = await prisma.clinic.findUnique({
+      where: {
+        name: String(clinic)
+      }
+    })
+    
+    let clinic_id = null
+    
+    if (clinicRecord) {
+      console.log('[DB STEP 4] Clinic found:', clinicRecord.id)
+      clinic_id = clinicRecord.id
+    } else {
+      console.log('[DB STEP 4a] Clinic not found, creating new clinic')
+      const newClinic = await prisma.clinic.create({
+        data: {
+          name: String(clinic),
+          address: 'Default Address'
+        }
+      })
+      console.log('[DB STEP 4b] Clinic created:', newClinic.id)
+      clinic_id = newClinic.id
+    }
+
+    if (!patient) {
+      console.log('[DB STEP 5] Creating new patient with clinic')
+      
+      // Generate unique patientId
+      const patientId = `PAT_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      patient = await prisma.patient.create({
+        data: {
+          patientId: patientId,
+          name: String(name),
+          phone: String(phone),
+          email: null,
+          age: 0,  // Default age since not provided
+          gender: 'Not Specified',  // Default gender
+          reason: String(reason),
+          clinicId: clinic_id
+        }
+      })
+      
+      console.log('[DB STEP 6] Patient created successfully')
+      console.log('[DB STEP 6 DATA]', patient)
+    } else {
+      console.log('[DB STEP 5] Patient already exists, using existing patient:', patient.id)
+    }
+
+    console.log('[DB STEP 7] Creating token')
+
+    const tokenRecord = await prisma.token.create({
+      data: {
+        tokenNumber: Number(tokenNumber),
+        reason: String(reason),
+        status: 'WAITING',
+
+        clinicId: clinic_id,
+        patientId: patient.id
+      }
+    })
+
+    console.log('[DB STEP 8] Token created successfully')
+    console.log(tokenRecord)
+
+  console.log('[PRISMA] Token created:', tokenRecord.id)
+
+} catch (dbError) {
+  console.error('[PRISMA DATABASE ERROR]')
+  console.error('========== DATABASE ERROR ==========')
+  console.error(dbError)
+  console.error('ERROR MESSAGE:', dbError.message)
+  console.error('ERROR STACK:', dbError.stack)
+
+
+  return res.status(500).json({
+    success: false,
+    error: 'Database insert failed',
+    details: dbError.message
+  })
+}
     // Add token to queue array
     queueArray.push(tokenData)
 
@@ -229,10 +325,19 @@ export const addToken = async (req, res) => {
       message: 'Token created successfully'
     })
   } catch (error) {
-    console.error('[ADD TOKEN ERROR]', error)
+    console.error('[ADD TOKEN ERROR] Exception occurred')
+    console.error('  Error name:', error.name)
+    console.error('  Error message:', error.message)
+    console.error('  Error code:', error.code)
+    console.error('  Error stack:', error.stack)
+    if (error.meta) {
+      console.error('  Prisma meta:', error.meta)
+    }
     res.status(500).json({
+      success: false,
       error: 'Internal Server Error',
-      message: error.message
+      message: error.message,
+      code: error.code || 'UNKNOWN_ERROR'
     })
   }
 }
