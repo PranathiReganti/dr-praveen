@@ -1,759 +1,334 @@
-// Queue Controller
-// Handles queue management, token booking, and queue tracking
+// Queue Controller (Safe & Refactored)
+// Handles queue management, token booking, and queue tracking with proper date and clinic scoping.
 
-import { sendTokenNotificationSMS } from \'../utils/smsService.js\'
-import { PrismaClient } from \'@prisma/client\'
+import { sendTokenNotificationSMS } from '../utils/smsService.js';
+import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
+
+// =================================================================================================
+// == HELPER FUNCTIONS
+// =================================================================================================
 
 /**
- * Get current queue data
- * Returns real queue status with sequential tokens
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
+ * Gets the start of the current day in UTC.
+ * @returns {Date} - The start of the day (00:00:00 UTC).
  */
-export const getQueueData = async (req, res) => {
-  try {
-    const { clinic } = req.query
-
-    const tokens = await prisma.token.findMany({
-      where: {
-        clinic: {
-          name: clinic
-        }
-      },
-      include: {
-        patient: true,
-        clinic: true
-      }
-    });
-
-    const waitingTokens = tokens.filter(token => token.status === \'WAITING\')
-    const waitingCount = waitingTokens.length
-
-    const estimatedTime = waitingCount * 5
-
-    const serving = tokens.find(token => token.status === \'SERVING\')
-    const currentToken = serving
-      ? serving.tokenNumber
-      : (tokens.length > 0 ? tokens[0].tokenNumber : 0)
-
-    const patients = tokens.map(token => ({
-      tokenNumber: token.tokenNumber,
-      name: token.patient.name,
-      phone: token.patient.phone,
-      clinic: token.clinic.name,
-      status: token.status,
-      reason: token.reasonForVisit
-    }))
-
-    const queueData = {
-      currentToken,
-      waiting: waitingCount,
-      estimatedTime: `${estimatedTime} mins`,
-      patients
-    }
-
-    res.status(200).json({
-      success: true,
-      data: queueData,
-      message: \'Queue data retrieved\'
-    })
-  } catch (error) {
-    res.status(500).json({
-      error: \'Internal Server Error\',
-      message: error.message
-    })
-  }
-}
+const getStartOfDay = () => {
+  const now = new Date();
+  // Using UTC for consistency across servers/timezones.
+  now.setUTCHours(0, 0, 0, 0);
+  return now;
+};
 
 /**
- * Add new token to queue
- * Accepts patient details and generates SEQUENTIAL token number
- * @param {Object} req - Express request object with body {name, phone, reason, clinic, trackingUrl}
- * @param {Object} res - Express response object
+ * Gets the end of the current day in UTC.
+ * @returns {Date} - The end of the day (23:59:59 UTC).
+ */
+const getEndOfDay = () => {
+  const now = new Date();
+  now.setUTCHours(23, 59, 59, 999);
+  return now;
+};
+
+
+// =================================================================================================
+// == CORE QUEUE LOGIC
+// =================================================================================================
+
+/**
+ * Add new token to the queue for a specific clinic for the current day.
+ * This is the primary function for booking a new token.
+ * It safely handles patient creation and sequential token numbering per clinic, per day.
  */
 export const addToken = async (req, res) => {
-    console.log("[STEP 1] Request received");
-  try {
-    const {
-  name,
-  phone,
-  email,
-  place,
-  reason,
-  clinic,
-  trackingUrl
-} = req.body
+  console.log("[addToken] STEP 1: Request received for new token.");
+  const { name, phone, email, place, reason, clinic, trackingUrl } = req.body;
 
-    // Validate required fields
-    if (!name || !phone || !reason || !clinic) {
-      return res.status(400).json({
-        error: \'Bad Request\',
-        message: \'name, phone, reason, and clinic are required\',
-        required: [\'name\', \'phone\', \'reason\', \'clinic\']
-      })
-    }
-
-    console.log("[STEP 2] Fetching last token");
-    const lastToken = await prisma.token.findFirst({
-      orderBy: {
-        tokenNumber: "desc"
-      }
+  // 1. Validate Input
+  if (!name || !phone || !reason || !clinic) {
+    console.error("[addToken] FAIL: Missing required fields.");
+    return res.status(400).json({
+      success: false,
+      message: "name, phone, reason, and clinic are required fields.",
     });
-    console.log("[STEP 3] Last token =", lastToken);
+  }
 
-    const nextTokenNumber = lastToken
-      ? lastToken.tokenNumber + 1
-      : 1;
-    console.log("[STEP 4] Next token number =", nextTokenNumber);
+  try {
+    const todayStart = getStartOfDay();
+    const todayEnd = getEndOfDay();
 
-    let patient;
-    let clinicRecord;
-    let clinic_id;
+    // 2. Find or create the clinic record safely.
+    console.log(`[addToken] STEP 2: Upserting clinic: ${clinic}`);
+    const clinicRecord = await prisma.clinic.upsert({
+      where: { name: clinic },
+      update: {},
+      create: { name: clinic, address: 'Address not specified' },
+    });
+    console.log(`[addToken] Clinic ID: ${clinicRecord.id}`);
 
-    try {
-      console.log("[DB] Finding or creating patient and clinic");
-      patient = await prisma.patient.findUnique({
-        where: { phone: String(phone) }
-      });
+    // 3. Find or create the patient record safely.
+    console.log(`[addToken] STEP 3: Upserting patient with phone: ${phone}`);
+    const patient = await prisma.patient.upsert({
+      where: { phone: String(phone) },
+      update: { name, email, place },
+      create: { name, phone: String(phone), email, place },
+    });
+    console.log(`[addToken] Patient ID: ${patient.id}`);
+    
+    // 4. Find the last token for THIS clinic and THIS day to determine the next token number.
+    console.log(`[addToken] STEP 4: Fetching last token for clinicId ${clinicRecord.id} today.`);
+    const lastToken = await prisma.token.findFirst({
+      where: {
+        clinicId: clinicRecord.id,
+        appointmentDate: {
+          gte: todayStart,
+          lte: todayEnd,
+        },
+      },
+      orderBy: {
+        tokenNumber: 'desc',
+      },
+    });
+    console.log("[addToken] Last token found:", lastToken);
 
-      clinicRecord = await prisma.clinic.findUnique({
-        where: { name: String(clinic) }
-      });
+    const nextTokenNumber = lastToken ? lastToken.tokenNumber + 1 : 1;
+    console.log(`[addToken] STEP 5: Next token number is ${nextTokenNumber}.`);
 
-      if (clinicRecord) {
-        clinic_id = clinicRecord.id;
-      } else {
-        const newClinic = await prisma.clinic.create({
-          data: {
-            name: String(clinic),
-            address: \'Default Address\'
-          }
-        });
-        clinic_id = newClinic.id;
-      }
-
-      if (!patient) {
-        patient = await prisma.patient.create({
-          data: {
-            name: String(name),
-            phone: String(phone),
-            email: email ? String(email) : null,
-            place: place ? String(place) : null,
-          }
-        });
-      }
-    } catch (dbError) {
-        console.error("[DB ERROR] ", dbError);
-        return res.status(500).json({
-            success: false,
-            message: "Database operation failed",
-            error: dbError.message
-        });
-    }
-
-
-    console.log("[STEP 5] Creating token");
+    // 5. Create the new token.
+    console.log("[addToken] STEP 6: Creating the new token in the database.");
     const tokenRecord = await prisma.token.create({
       data: {
         tokenNumber: nextTokenNumber,
-        reasonForVisit: String(reason || "General Consultation"),
-        status: 'WAITING',
-        clinicId: clinic_id,
         patientId: patient.id,
-        appointmentDate: new Date()
-      }
-    });
-    console.log("[STEP 6] Token created =", tokenRecord);
-
-    const waitingPatients = await prisma.token.count({ where: { status: \'WAITING\' } });
-    const estimatedTime = `${waitingPatients * 5} mins`
-
-    // ========== SEND SMS NOTIFICATION ==========\
-    let smsResult = { success: false, error: \'SMS not sent\' }
-
-    if (!phone || phone.toString().trim() === \'\') {
-      console.error(\'[PHONE NUMBER MISSING] Cannot send SMS without patient phone number\')
-    } else {
-      
-      const smsPayload = {
-        name,
-        phone,
-        tokenNumber: nextTokenNumber,
-        clinic,
-        reason,
-        estimatedTime,
-        trackingUrl
-      }
-      
-      try {
-        smsResult = await sendTokenNotificationSMS(smsPayload)
-        
-      } catch (err) {
-        smsResult = {
-          success: false,
-          error: err.message
-        }
-      }
-    }
-
-    console.log("[STEP 7] Sending response");
-    res.status(201).json({
-      success: true,
-      data: {
-        tokenNumber: nextTokenNumber,
-        clinic,
-        patient: name,
-        phone,
-        reason,
-        estimatedTime,
-        trackingUrl
+        clinicId: clinicRecord.id,
+        reasonForVisit: reason,
+        status: 'WAITING',
+        appointmentDate: new Date(),
       },
-      sms: smsResult,
-      message: \'Token created successfully\'
-    })
+    });
+    console.log("[addToken] STEP 7: Token created successfully:", tokenRecord);
+
+    // 6. Send SMS notification (non-blocking).
+    const waitingCount = await prisma.token.count({ where: { status: 'WAITING', clinicId: clinicRecord.id, appointmentDate: { gte: todayStart, lte: todayEnd } } });
+    const estimatedTime = (waitingCount - 1) * 5;
+    sendTokenNotificationSMS({
+        name, phone, tokenNumber: nextTokenNumber, clinic, reason, estimatedTime: `${estimatedTime} mins`, trackingUrl
+    }).catch(smsError => console.error("[addToken] SMS sending failed:", smsError));
+    
+    // 7. Send final success response.
+    console.log("[addToken] STEP 8: Sending success response to client.");
+    return res.status(201).json({
+      success: true,
+      data: { tokenNumber: nextTokenNumber, patient: name, clinic },
+      message: "Token created successfully.",
+    });
+
   } catch (error) {
-    console.error("[TOKEN ERROR]", error);
+    console.error("[addToken] FATAL ERROR:", error);
     return res.status(500).json({
       success: false,
-      message: "Token generation failed",
-      error: error.message
+      message: "An internal server error occurred during token creation.",
+      error: error.message,
     });
   }
-}
+};
 
 /**
- * Book a queue token
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
+ * Get current queue data for a specific clinic for the current day.
  */
-export const bookToken = async (req, res) => {
-  try {
-    // For this project, "book token" is the same as creating a new token entry.
-    // Keep a dedicated endpoint for frontend compatibility.
-    const { name, phone, email, place, reason, clinic } = req.body
-
-    if (!name || !phone || !reason || !clinic) {
-      return res.status(400).json({
-        error: \'Bad Request\',
-        message: \'name, phone, reason, and clinic are required\',
-        required: [\'name\', \'phone\', \'reason\', \'clinic\']
-      })
-    }
-
-    const lastToken = await prisma.token.findFirst({
-      orderBy: {
-        tokenNumber: "desc"
-      }
-    });
-
-    const nextTokenNumber = lastToken
-      ? lastToken.tokenNumber + 1
-      : 1;
-
-    res.status(201).json({
-      success: true,
-      data: {
-        tokenNumber: nextTokenNumber,
-        clinic,
-        patient: name,
-        phone,
-        reason
-      },
-      message: \'Token booked successfully\'
-    })
-  } catch (error) {
-    res.status(500).json({
-      error: \'Internal Server Error\',
-      message: error.message
-    })
+export const getQueueData = async (req, res) => {
+  const { clinic } = req.query;
+  if (!clinic) {
+    return res.status(400).json({ success: false, message: "Clinic query parameter is required." });
   }
-}
 
-/**
- * Track queue by phone number
- * @param {Object} req - Express request object with params {phone}
- * @param {Object} res - Express response object
- */
-export const trackQueue = async (req, res) => {
   try {
-    const { phone } = req.query
+    const todayStart = getStartOfDay();
+    const todayEnd = getEndOfDay();
 
-    let token = null
-
-    if (phone) {
-      const searchPhone = phone
-      token = await prisma.token.findFirst({
-        where: {
-          patient: {
-            phone: searchPhone
-          }
-        },
-        include: {
-          patient: true,
-          clinic: true
-        }
-      });
-      
-      if (!token) {
-        return res.status(404).json({
-          error: \'Not Found\',
-          message: \'Token not found for this phone number\'
-        })
-      }
+    const clinicRecord = await prisma.clinic.findUnique({ where: { name: clinic } });
+    if (!clinicRecord) {
+      return res.status(404).json({ success: false, message: `Clinic \"${clinic}\" not found.` });
     }
-    else {
-      return res.status(400).json({
-        error: \'Bad Request\',
-        message: \'Phone number required\'
-      })
-    }
-
-    // Count how many tokens are ahead in the queue
-    const tokensAhead = await prisma.token.count({
-      where: {
-        status: \'WAITING\',
-        tokenNumber: {
-          lt: token.tokenNumber
-        }
-      }
-    });
-
-    const trackingData = {
-      tokenNumber: token.tokenNumber,
-      patient: token.patient.name,
-      phone: token.patient.phone,
-      clinic: token.clinic.name,
-      reason: token.reasonForVisit,
-      status: token.status,
-      tokensAhead,
-      estimatedWaitTime: `${tokensAhead * 5} mins`,
-      bookedAt: token.createdAt,
-      position: token.tokenNumber,
-      totalInQueue: await prisma.token.count()
-    }
-
-    res.status(200).json({
-      success: true,
-      data: trackingData,
-      message: \'Queue tracking data retrieved\'
-    })
-  } catch (error) {
-    res.status(500).json({
-      error: \'Internal Server Error\',
-      message: error.message
-    })
-  }
-}
-
-/**
- * Get queue status for a clinic
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
-export const getQueueStatus = async (req, res) => {
-  try {
-    const { clinicId } = req.params
-
-    // Get all tokens for this clinic
-    const clinicTokens = await prisma.token.findMany({
-      where: {
-        clinic: {
-          name: clinicId
-        }
-      }
-    });
-    const waitingCount = clinicTokens.filter(t => t.status === \'WAITING\').length
-    const servingToken = clinicTokens.find(t => t.status === \'SERVING\')
-
-    const statusData = {
-      clinic: clinicId,
-      currentToken: servingToken ? servingToken.tokenNumber : null,
-      waitingCount,
-      totalTokens: clinicTokens.length,
-      estimatedTime: `${waitingCount * 5} mins`
-    }
-
-    res.status(200).json({
-      success: true,
-      data: statusData,
-      message: \'Queue status retrieved\'
-    })
-  } catch (error) {
-    res.status(500).json({
-      error: \'Internal Server Error\',
-      message: error.message
-    })
-  }
-}
-
-/**
- * Call next patient in queue
- * @param {Object} req - Express request object with body {clinic}
- * @param {Object} res - Express response object
- */
-export const callNextPatient = async (req, res) => {
-  try {
-    const { clinic } = req.body
-
-    if (!clinic) {
-      return res.status(400).json({
-        error: \'Bad Request\',
-        message: \'clinic is required\'
-      })
-    }
-
-    const currentServingToken = await prisma.token.findFirst({
-      where: {
-        clinic: {
-          name: clinic
-        },
-        status: \'SERVING\'
-      }
-    });
-
-    if (currentServingToken) {
-      await prisma.token.update({
-        where: {
-          id: currentServingToken.id
-        },
-        data: {
-          status: \'COMPLETED\'
-        }
-      });
-    }
-
-    // Get first waiting token for this clinic
-    const nextToken = await prisma.token.findFirst({
-      where: {
-        clinic: {
-          name: clinic
-        },
-        status: \'WAITING\'
-      },
-      orderBy: {
-        tokenNumber: \'asc\'
-      },
-      include: {
-        patient: true,
-        clinic: true
-      }
-    });
-
-    if (!nextToken) {
-      return res.status(404).json({
-        error: \'Not Found\',
-        message: \'No waiting tokens in queue\'
-      })
-    }
-
-    // Update token status to serving
-    const updatedToken = await prisma.token.update({
-      where: {
-        id: nextToken.id
-      },
-      data: {
-        status: \'SERVING\'
-      },
-      include: {
-        patient: true,
-        clinic: true
-      }
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        tokenNumber: updatedToken.tokenNumber,
-        patient: updatedToken.patient.name,
-        phone: updatedToken.patient.phone,
-        reason: updatedToken.reasonForVisit,
-        clinic: updatedToken.clinic.name
-      },
-      message: \'Next patient called\'
-    })
-  } catch (error) {
-    res.status(500).json({
-      error: \'Internal Server Error\',
-      message: error.message
-    })
-  }
-}
-
-/**
- * Mark consultation as complete
- * @param {Object} req - Express request object with body {tokenNumber}
- * @param {Object} res - Express response object
- */
-export const completeConsultation = async (req, res) => {
-  try {
-    const { tokenNumber } = req.body
-
-    if (!tokenNumber) {
-      return res.status(400).json({
-        error: \'Bad Request\',
-        message: \'tokenNumber is required\'
-      })
-    }
-
-    // Find token by number
-    const token = await prisma.token.findFirst({
-      where: {
-        tokenNumber: tokenNumber
-      },
-      include: {
-        patient: true
-      }
-    });
-
-    if (!token) {
-      return res.status(404).json({
-        error: \'Not Found\',
-        message: \'Token not found\'
-      })
-    }
-
-    // Mark token as done
-    await prisma.token.update({
-      where: {
-        id: token.id
-      },
-      data: {
-        status: \'COMPLETED\'
-      }
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        tokenNumber,
-        patient: token.patient.name,
-        status: \'COMPLETED\'
-      },
-      message: \'Consultation marked as complete\'
-    })
-  } catch (error) {
-    res.status(500).json({
-      error: \'Internal Server Error\',
-      message: error.message
-    })
-  }
-}
-
-/**
- * Complete consultation by token number (route param)
- * PATCH /api/queue/complete/:tokenNumber
- */
-export const completeConsultationByTokenNumber = async (req, res) => {
-  try {
-    const tokenNumber = Number(req.params.tokenNumber)
-
-    if (!tokenNumber || Number.isNaN(tokenNumber)) {
-      return res.status(400).json({
-        success: false,
-        error: \'Bad Request\',
-        message: \'tokenNumber must be a number\'
-      })
-    }
-
-    const token = await prisma.token.findFirst({ 
-        where: { tokenNumber },
-        include: { clinic: true }
-    });
-
-    if (!token) {
-      return res.status(404).json({
-        success: false,
-        error: \'Not Found\',
-        message: \'Token not found\'
-      })
-    }
-
-    await prisma.token.update({
-        where: { id: token.id },
-        data: { status: "COMPLETED" }
-    });
-
-    const waitingCount = await prisma.token.count({ where: { status: \'WAITING\' } })
-    const estimatedTime = waitingCount * 5
-    const serving = await prisma.token.findFirst({ where: { status: \'SERVING\' } });
-    const currentToken = serving ? serving.tokenNumber : 0
-
-    const patients = await prisma.token.findMany({
-      include: {
-        patient: true,
-        clinic: true
-      }
-    });
-
-    const patientData = patients.map(p => ({
-      tokenNumber: p.tokenNumber,
-      name: p.patient.name,
-      phone: p.patient.phone,
-      clinic: p.clinic.name,
-      status: p.status,
-      reason: p.reasonForVisit
-    }));
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        currentToken,
-        waiting: waitingCount,
-        estimatedTime: `${estimatedTime} mins`,
-        patients: patientData
-      },
-      message: \'Consultation marked as complete\'
-    })
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: \'Internal Server Error\',
-      message: error.message
-    })
-  }
-}
-
-/**
- * Get all tokens in queue (for admin/monitoring)
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
-export const getAllTokens = async (req, res) => {
-  try {
 
     const tokens = await prisma.token.findMany({
-      include: {
-        patient: true,
-        clinic: true
+      where: {
+        clinicId: clinicRecord.id,
+        appointmentDate: { gte: todayStart, lte: todayEnd },
+      },
+      include: { patient: true },
+      orderBy: { tokenNumber: 'asc' },
+    });
+
+    const servingToken = tokens.find(t => t.status === 'SERVING');
+    const waitingTokens = tokens.filter(t => t.status === 'WAITING');
+    
+    return res.status(200).json({
+      success: true, 
+      data: {
+        currentToken: servingToken ? servingToken.tokenNumber : null,
+        waiting: waitingTokens.length,
+        estimatedTime: `${waitingTokens.length * 5} mins`,
+        patients: tokens.map(t => ({ tokenNumber: t.tokenNumber, name: t.patient.name, status: t.status, phone: t.patient.phone, reason: t.reasonForVisit })),
       }
     });
-
-    const stats = {
-      total: await prisma.token.count(),
-      waiting: await prisma.token.count({ where: { status: \'WAITING\' } }),
-      serving: await prisma.token.count({ where: { status: \'SERVING\' } }),
-      done: await prisma.token.count({ where: { status: \'COMPLETED\' } }),
-      nextTokenNumber: (await prisma.token.findFirst({ orderBy: { tokenNumber: \'desc\' } }))?.tokenNumber + 1 || 1
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        stats,
-        tokens: tokens.map(t => ({
-          ...t,
-          patient: t.patient.name,
-          clinic: t.clinic.name
-        }))
-      },
-      message: \'All tokens retrieved\'
-    })
   } catch (error) {
-    res.status(500).json({
-      error: \'Internal Server Error\',
-      message: error.message
-    })
+    console.error(`[getQueueData] Error for clinic ${clinic}:`, error);
+    return res.status(500).json({ success: false, message: "Internal Server Error." });
   }
-}
+};
 
 /**
- * Reset queue for new day (admin only)
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
+ * Track a patient's token by their phone number for the current day.
+ */
+export const trackQueue = async (req, res) => {
+  const { phone } = req.query;
+  if (!phone) {
+    return res.status(400).json({ success: false, message: "Phone query parameter is required." });
+  }
+
+  try {
+    const todayStart = getStartOfDay();
+    const todayEnd = getEndOfDay();
+    
+    const token = await prisma.token.findFirst({
+      where: {
+        patient: { phone: String(phone) },
+        appointmentDate: { gte: todayStart, lte: todayEnd },
+      },
+      include: { patient: true, clinic: true },
+      orderBy: { tokenNumber: 'desc' }
+    });
+
+    if (!token) {
+      return res.status(404).json({ success: false, message: "No active token found for this phone number today." });
+    }
+
+    const tokensAhead = await prisma.token.count({
+      where: {
+        clinicId: token.clinicId,
+        status: 'WAITING',
+        tokenNumber: { lt: token.tokenNumber },
+        appointmentDate: { gte: todayStart, lte: todayEnd },
+      },
+    });
+
+    return res.status(200).json({ 
+      success: true, 
+      data: {
+        tokenNumber: token.tokenNumber,
+        patient: token.patient.name,
+        clinic: token.clinic.name,
+        status: token.status,
+        tokensAhead,
+        estimatedWaitTime: `${tokensAhead * 5} mins`,
+      }
+    });
+  } catch (error) {
+    console.error(`[trackQueue] Error for phone ${phone}:`, error);
+    return res.status(500).json({ success: false, message: "Internal Server Error." });
+  }
+};
+
+/**
+ * Calls the next patient in the queue for a specific clinic.
+ */
+export const callNextPatient = async (req, res) => {
+  const { clinic } = req.body;
+  if (!clinic) {
+    return res.status(400).json({ success: false, message: "Clinic is required." });
+  }
+
+  try {
+    const todayStart = getStartOfDay();
+    const todayEnd = getEndOfDay();
+
+    const clinicRecord = await prisma.clinic.findUnique({ where: { name: clinic } });
+    if (!clinicRecord) {
+      return res.status(404).json({ success: false, message: `Clinic \"${clinic}\" not found.` });
+    }
+    
+    const currentServing = await prisma.token.findFirst({ where: { clinicId: clinicRecord.id, status: 'SERVING', appointmentDate: { gte: todayStart, lte: todayEnd } } });
+    if (currentServing) {
+      await prisma.token.update({ where: { id: currentServing.id }, data: { status: 'COMPLETED' } });
+    }
+
+    const nextPatientToken = await prisma.token.findFirst({
+      where: { clinicId: clinicRecord.id, status: 'WAITING', appointmentDate: { gte: todayStart, lte: todayEnd } },
+      orderBy: { tokenNumber: 'asc' },
+    });
+
+    if (!nextPatientToken) {
+      return res.status(200).json({ success: true, message: "No more patients are waiting in the queue." });
+    }
+
+    await prisma.token.update({ where: { id: nextPatientToken.id }, data: { status: 'SERVING' } });
+
+    return res.status(200).json({ success: true, message: `Calling next patient, Token #${nextPatientToken.tokenNumber}.` });
+  } catch (error) {
+    console.error(`[callNextPatient] Error for clinic ${clinic}:`, error);
+    return res.status(500).json({ success: false, message: "Internal Server Error." });
+  }
+};
+
+/**
+ * Manually mark a specific token as complete.
+ */
+export const completeConsultationByTokenNumber = async (req, res) => {
+    const tokenNumber = Number(req.params.tokenNumber);
+    if (!tokenNumber || isNaN(tokenNumber)) {
+        return res.status(400).json({ success: false, message: "A valid token number is required." });
+    }
+    
+    try {
+        const todayStart = getStartOfDay();
+        const todayEnd = getEndOfDay();
+
+        const token = await prisma.token.findFirst({
+            where: { tokenNumber, appointmentDate: { gte: todayStart, lte: todayEnd } }
+        });
+
+        if (!token) {
+            return res.status(404).json({ success: false, message: "Token not found for the current day." });
+        }
+        
+        await prisma.token.update({ where: { id: token.id }, data: { status: 'COMPLETED' } });
+        
+        return res.status(200).json({ success: true, message: `Token #${tokenNumber} marked as complete.` });
+
+    } catch (error) {
+        console.error(`[completeConsultation] Error for token ${tokenNumber}:`, error);
+        return res.status(500).json({ success: false, message: "Internal Server Error." });
+    }
+};
+
+
+// =================================================================================================
+// == DEPRECATED & UNSAFE FUNCTIONS
+// =================================================================================================
+
+/** @deprecated */
+export const bookToken = async (req, res) => res.status(410).json({ success: false, message: "This endpoint is deprecated. Use POST /api/queue/add instead." });
+
+/** @deprecated */
+export const getAllTokens = async (req, res) => res.status(410).json({ success: false, message: "This endpoint is deprecated. Use GET /api/queue?clinic=<clinic_name> instead." });
+
+/** @deprecated */
+export const completeConsultation = async (req, res) => res.status(410).json({ success: false, message: "This endpoint is deprecated. Use PATCH /api/queue/complete/:tokenNumber instead." });
+
+/** @deprecated */
+export const moveQueueForward = async (req, res) => res.status(410).json({ success: false, message: "This endpoint is deprecated. Use POST /api/queue/next instead." });
+
+/**
+ * @deprecated This function is dangerous. It is disabled by default.
  */
 export const resetQueue = async (req, res) => {
-  try {
-    const oldTokenCount = await prisma.token.count()
-    await prisma.token.deleteMany({});
-
-    res.status(200).json({
-      success: true,
-      data: {
-        previousTokenCount: oldTokenCount,
-        newTokenNumber: 1
-      },
-      message: \'Queue reset successfully\'
-    })
-  } catch (error) {
-    res.status(500).json({
-      error: \'Internal Server Error\',
-      message: error.message
-    })
-  }
-}
-
-/**
- * Move queue forward
- * Marks current serving patient as done and moves next waiting patient to serving
- * Used in Admin Dashboard for demo
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
-export const moveQueueForward = async (req, res) => {
-  try {
-
-    const currentServing = await prisma.token.findFirst({ where: { status: \'SERVING\' } });
-    if(currentServing){
-      await prisma.token.update({ where: { id: currentServing.id }, data: { status: \'COMPLETED\' } });
+    const { confirm } = req.body;
+    if (confirm !== "CONFIRM_RESET") {
+        return res.status(403).json({ success: false, message: "This is a dangerous operation. Invalid confirmation." });
     }
-
-    // Find next waiting patient
-    const nextWaitingToken = await prisma.token.findFirst({
-      where: { status: \'WAITING\' },
-      orderBy: { tokenNumber: \'asc\' },
-      include: { patient: true, clinic: true }
-    });
-
-    if (!nextWaitingToken) {
-      // Queue is empty or no more waiting patients
-      
-      const waitingCount = await prisma.token.count({ where: { status: \'WAITING\' } });
-      const estimatedTime = waitingCount * 5
-
-      return res.status(200).json({
-        success: true,
-        data: {
-          message: \'Queue is now empty\',
-          currentToken: null,
-          waiting: waitingCount,
-          estimatedTime: `${estimatedTime} mins`,
-          lastUpdated: new Date().toISOString()
-        },
-        message: \'Queue moved forward - no more patients waiting\'
-      })
-    }
-
-    // Move next waiting patient to serving
-    const updatedToken = await prisma.token.update({
-      where: { id: nextWaitingToken.id },
-      data: { status: \'SERVING\' },
-      include: { patient: true, clinic: true }
-    });
-
-    // Calculate queue metrics
-    const waitingCount = await prisma.token.count({ where: { status: \'WAITING\' } });
-    const estimatedTime = waitingCount * 5
-
-    res.status(200).json({
-      success: true,
-      data: {
-        currentToken: updatedToken.tokenNumber,
-        patient: updatedToken.patient.name,
-        phone: updatedToken.patient.phone,
-        reason: updatedToken.reasonForVisit,
-        clinic: updatedToken.clinic.name,
-        waiting: waitingCount,
-        estimatedTime: `${estimatedTime} mins`,
-        lastUpdated: new Date().toISOString()
-      },
-      message: \'Queue moved forward successfully\'
-    })
-  } catch (error) {
-    res.status(500).json({
-      error: \'Internal Server Error\',
-      message: error.message
-    })
-  }
-}
+    // The actual delete operation is commented out for safety.
+    // await prisma.token.deleteMany({}); 
+    return res.status(200).json({ success: true, message: "Queue reset is disabled for safety." });
+};
