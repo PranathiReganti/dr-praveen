@@ -107,16 +107,13 @@ export const getQueueData = async (req, res) => {
   const { clinic } = req.query;
 
   try {
-    const todayStart = getStartOfDay();
-    const todayEnd = getEndOfDay();
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
 
-    // Build the where clause to optionally filter by clinic
-    let whereClause = {
-        appointmentDate: {
-            gte: todayStart,
-            lte: todayEnd,
-        },
-    };
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    let whereClause = {};
 
     if (clinic) {
         const clinicRecord = await prisma.clinic.findUnique({ where: { name: clinic } });
@@ -129,8 +126,14 @@ export const getQueueData = async (req, res) => {
     }
 
     const tokens = await prisma.token.findMany({
-      where: whereClause,
-      include: { patient: true, clinic: true }, // Include clinic for name
+      where: {
+        ...whereClause,
+        appointmentDate: {
+          gte: startOfDay,
+          lte: endOfDay
+        }
+      },
+      include: { patient: true, clinic: true },
       orderBy: { tokenNumber: 'asc' },
     });
 
