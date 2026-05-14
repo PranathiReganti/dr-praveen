@@ -225,11 +225,19 @@ try {
     const tokenRecord = await prisma.token.create({
       data: {
         tokenNumber: Number(tokenNumber),
+
+        reason: String(
+          reason ||
+          reasonForVisit ||
+          "General Consultation"
+        ),
+
         reasonForVisit: String(
           reasonForVisit ||
           reason ||
           "General Consultation"
         ),
+
         status: 'WAITING',
 
         clinicId: clinic_id,
