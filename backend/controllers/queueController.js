@@ -48,10 +48,11 @@ export const addToken = async (req, res) => {
     });
 
     console.log(`[addToken] STEP 3: Upserting patient with phone: ${phone}`);
+    const generatedPatientId = `PAT_${Date.now()}`;
     const patient = await prisma.patient.upsert({
       where: { phone: String(phone) },
       update: { name, email, place },
-      create: { name, phone: String(phone), email, place },
+      create: {  patientId: generatedPatientId,name, phone: String(phone), email, place },
     });
     
     // DEBUG LOG as requested
