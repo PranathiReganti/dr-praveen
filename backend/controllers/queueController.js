@@ -303,6 +303,30 @@ export const completeConsultationByTokenNumber = async (req, res) => {
     }
 };
 
+/**
+ * Restores the getQueueStatus function to prevent deployment crashes.
+ * This is a temporary measure to ensure the API route remains available.
+ */
+export const getQueueStatus = async (req, res) => {
+  try {
+    const queue = await prisma.token.findMany({
+      orderBy: {
+        tokenNumber: "asc"
+      }
+    });
+
+    return res.json({
+      success: true,
+      data: queue
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 
 // =================================================================================================
 // == DEPRECATED & UNSAFE FUNCTIONS
