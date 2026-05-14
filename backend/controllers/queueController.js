@@ -225,6 +225,7 @@ try {
       data: {
         tokenNumber: Number(tokenNumber),
         reason: String(reason || "General Consultation"),
+        reasonForVisit: String(reason || "General Consultation"),
         status: 'WAITING',
         clinicId: clinic_id,
         patientId: patient.id

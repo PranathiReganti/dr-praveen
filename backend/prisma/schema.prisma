@@ -65,6 +65,7 @@ model Token {
   clinic        Clinic @relation(fields: [clinicId], references: [id])
 
   reason        String
+  reasonForVisit String
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
