@@ -52,7 +52,9 @@ export const addToken = async (req, res) => {
     const patient = await prisma.patient.upsert({
       where: { phone: String(phone) },
       update: { name, email, place },
-      create: {  patientId: generatedPatientId,name, phone: String(phone), email, place },
+      create: {  patientId: generatedPatientId,name, phone: String(phone), email, place, age:0, gender: "Not Specified",
+        reason: reason || "General Consultation",
+        clinicId: clinicRecord.id },
     });
     
     // DEBUG LOG as requested
