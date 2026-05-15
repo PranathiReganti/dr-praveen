@@ -78,6 +78,10 @@ export const addToken = async (req, res) => {
     const nextTokenNumber = lastToken ? lastToken.tokenNumber + 1 : 1;
     console.log(`[addToken] STEP 5: Next token number is ${nextTokenNumber}.`);
 
+    // DEBUG LOGS - as requested
+    console.log("patient.id =", patient.id);
+    console.log("patient.patientId =", patient.patientId);
+
     console.log("[addToken] STEP 6: Creating the new token in the database.");
     const tokenRecord = await prisma.token.create({
       data: {
